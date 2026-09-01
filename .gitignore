@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+backend/.venv/
+
+# Node / frontend build
+node_modules/
+frontend/dist/
+
+# clipman runtime (번들 바이너리와 산출물은 커밋하지 않음)
+bin/
+work/
+output/
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

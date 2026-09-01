@@ -1,0 +1,471 @@
+<title>Cobalt Teardown</title>
+<meta name="description" content="clipman 벤치마크로서 cobalt.tools를 코드 원문 기준으로 해부한 기술 분석">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF1F7; --surface-3:#E4E9F2;
+    --ink:#161B22; --muted:#54606F; --faint:#8792A2; --border:#DCE2EC;
+    --accent:#1E4FD1; --accent-2:#3E6FE0; --accent-soft:#E7EDFC;
+    --clip:#C2410C; --clip-soft:#FBEBE1;
+    --good:#1C7C4A; --good-soft:#E1F3E9; --warn:#9A6714; --warn-soft:#F7EEDD;
+    --code-bg:#F1F4FA; --code-ink:#243049;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --maxw:1080px; --readw:760px;
+    --shadow:0 1px 2px rgba(20,30,50,.04),0 6px 20px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B0F16; --surface:#131A24; --surface-2:#19212D; --surface-3:#212B39;
+      --ink:#E7EBF2; --muted:#9BA6B5; --faint:#67727F; --border:#28313F;
+      --accent:#6B99F2; --accent-2:#83ACF6; --accent-soft:#152239;
+      --clip:#F1885000; --clip:#F18850; --clip-soft:#2B1B10;
+      --good:#54D08A; --good-soft:#12251A; --warn:#E2B84A; --warn-soft:#2A2110;
+      --code-bg:#0E141E; --code-ink:#C7D3E6;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B0F16; --surface:#131A24; --surface-2:#19212D; --surface-3:#212B39;
+    --ink:#E7EBF2; --muted:#9BA6B5; --faint:#67727F; --border:#28313F;
+    --accent:#6B99F2; --accent-2:#83ACF6; --accent-soft:#152239;
+    --clip:#F18850; --clip-soft:#2B1B10;
+    --good:#54D08A; --good-soft:#12251A; --warn:#E2B84A; --warn-soft:#2A2110;
+    --code-bg:#0E141E; --code-ink:#C7D3E6;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.62;-webkit-font-smoothing:antialiased;margin:0;font-size:16px}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  /* header */
+  header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .top .wrap{display:flex;align-items:center;gap:18px;height:56px}
+  .brand{font-family:var(--mono);font-weight:600;font-size:14px;letter-spacing:.02em;
+    color:var(--ink);display:flex;align-items:center;gap:9px;white-space:nowrap}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  nav.jump{margin-left:auto;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+  nav.jump::-webkit-scrollbar{display:none}
+  nav.jump a{font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;
+    padding:6px 10px;border-radius:7px;white-space:nowrap}
+  nav.jump a:hover{color:var(--ink);background:var(--surface-2)}
+  nav.jump a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* hero */
+  .hero{padding:64px 0 40px}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin:0 0 18px}
+  h1{font-size:clamp(34px,6vw,58px);line-height:1.02;letter-spacing:-.02em;font-weight:700;
+    margin:0;text-wrap:balance}
+  .thesis{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:640px;margin:22px 0 0;text-wrap:pretty}
+  .metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
+  .chip{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--surface);
+    border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+  .chip b{color:var(--ink);font-weight:600}
+
+  /* stat grid */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--border);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin:8px 0 8px}
+  .stat{background:var(--surface);padding:18px 18px 16px}
+  .stat .n{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.01em;
+    font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+
+  /* sections */
+  section{padding:46px 0;border-top:1px solid var(--border)}
+  .sechead{display:flex;align-items:baseline;gap:14px;margin:0 0 22px}
+  .secno{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;
+    padding-top:5px;min-width:30px}
+  h2{font-size:clamp(24px,3.6vw,32px);line-height:1.12;letter-spacing:-.015em;font-weight:700;margin:0;text-wrap:balance}
+  .lede{color:var(--muted);max-width:var(--readw);margin:0 0 26px;font-size:16.5px}
+  h3{font-size:18px;font-weight:600;letter-spacing:-.01em;margin:32px 0 12px}
+  p{max-width:var(--readw)}
+  p,li{color:var(--ink)}
+  .muted{color:var(--muted)}
+  strong{font-weight:600}
+  a{color:var(--accent);text-underline-offset:2px}
+
+  code{font-family:var(--mono);font-size:.87em;background:var(--code-bg);color:var(--code-ink);
+    padding:.12em .4em;border-radius:5px;border:1px solid var(--border)}
+  pre{font-family:var(--mono);font-size:13px;line-height:1.65;background:var(--code-bg);color:var(--code-ink);
+    border:1px solid var(--border);border-radius:12px;padding:16px 18px;overflow-x:auto;margin:16px 0}
+  pre code{background:none;border:none;padding:0}
+
+  /* tables */
+  .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;margin:18px 0;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  thead th{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+  /* cards */
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:18px 0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+  .card h4{margin:0 0 8px;font-size:15.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .card p{font-size:14px;margin:0;color:var(--muted)}
+  .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;
+    padding:3px 8px;border-radius:6px;white-space:nowrap}
+  .tag.code{background:var(--accent-soft);color:var(--accent)}
+  .tag.file{background:var(--surface-3);color:var(--muted)}
+
+  /* callout */
+  .callout{border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--surface);
+    border-radius:0 12px 12px 0;padding:16px 20px;margin:20px 0}
+  .callout.clip{border-left-color:var(--clip);background:var(--clip-soft)}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    font-weight:600;color:var(--muted);margin:0 0 6px}
+  .callout.clip .k{color:var(--clip)}
+  .callout p{margin:0;max-width:none}
+
+  /* flow diagram */
+  .flow{margin:22px 0;overflow-x:auto}
+  .flow-inner{min-width:560px;display:flex;flex-direction:column;gap:0}
+  .fstep{display:flex;align-items:stretch;gap:14px}
+  .fnode{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 15px;flex:1;box-shadow:var(--shadow)}
+  .fnode .ft{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent)}
+  .fnode .fd{font-size:13px;color:var(--muted);margin-top:3px}
+  .fnode.alt .ft{color:var(--clip)}
+  .farrow{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--faint);
+    font-family:var(--mono);min-height:20px;padding:6px 0}
+  .farrow span{font-size:16px;line-height:1}
+  .fbranch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0}
+  .fbranch .fnode{padding:10px 13px}
+
+  /* tree */
+  .tree{font-family:var(--mono);font-size:12.5px;line-height:1.85;background:var(--code-bg);color:var(--code-ink);
+    border:1px solid var(--border);border-radius:12px;padding:18px 20px;overflow-x:auto;margin:16px 0;white-space:pre}
+  .tree .c{color:var(--accent);font-weight:600}
+  .tree .n{color:var(--muted)}
+
+  ul.clean{list-style:none;padding:0;margin:14px 0}
+  ul.clean li{position:relative;padding-left:22px;margin:9px 0;max-width:var(--readw)}
+  ul.clean li::before{content:"";position:absolute;left:2px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  ul.clean.clip li::before{background:var(--clip)}
+
+  .verdict{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;font-weight:600;
+    padding:3px 9px;border-radius:6px}
+  .v-keep{background:var(--good-soft);color:var(--good)}
+  .v-drop{background:var(--clip-soft);color:var(--clip)}
+
+  footer{border-top:1px solid var(--border);padding:36px 0 64px;color:var(--muted);font-size:13.5px}
+  footer .wrap{max-width:var(--readw)}
+  footer a{word-break:break-all}
+  .srcgrid{font-family:var(--mono);font-size:12px;columns:2;column-gap:28px;margin-top:10px}
+  @media(max-width:640px){.srcgrid{columns:1}}
+  .disclaim{font-size:12.5px;color:var(--faint);margin-top:20px;max-width:var(--readw)}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <span class="brand"><span class="dot"></span>Cobalt Teardown</span>
+    <nav class="jump">
+      <a href="#overview">개요</a>
+      <a href="#code">코드 구조</a>
+      <a href="#flow">요청 흐름</a>
+      <a href="#media">미디어 처리</a>
+      <a href="#youtube">YouTube</a>
+      <a href="#web">프론트엔드</a>
+      <a href="#host">셀프호스팅</a>
+      <a href="#legal">라이선스·법적</a>
+      <a href="#clipman">clipman 시사점</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <p class="eyebrow">벤치마크 코드 분석 · imputnet/cobalt · main · 2026-09</p>
+    <h1>서명된 터널로 흐르는 다운로드 프록시</h1>
+    <p class="thesis">cobalt는 영상을 저장하지도 편집하지도 않습니다. 원본을 짧은 수명의 서명 URL로 감싸 그대로 흘려보내는 스트리밍 프록시입니다. 이 구조가 clipman이 무엇을 따라가고 무엇을 버려야 하는지를 정확히 알려줍니다.</p>
+    <div class="metarow">
+      <span class="chip">저장소 <b>imputnet/cobalt</b></span>
+      <span class="chip">api <b>Node.js + Express</b></span>
+      <span class="chip">web <b>SvelteKit</b></span>
+      <span class="chip">근거 <b>코드 원문 (raw)</b></span>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">3+2</div><div class="l">pnpm 워크스페이스 (api, web, packages 2개)</div></div>
+    <div class="stat"><div class="n">21</div><div class="l">플랫폼 추출기 (services/*.js)</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">편집 기능 (트림·클립, 스키마에 없음)</div></div>
+    <div class="stat"><div class="n">90s</div><div class="l">터널 메타데이터 수명, 원본 미저장</div></div>
+    <div class="stat"><div class="n">1</div><div class="l">필수 환경변수 (<span class="num">API_URL</span>)</div></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section id="overview">
+    <div class="sechead"><span class="secno">01</span><h2>한눈에 보는 실체</h2></div>
+    <p class="lede">cobalt의 정체성은 세 문장으로 압축됩니다. 이 셋이 나머지 모든 설계를 결정합니다.</p>
+    <ul class="clean">
+      <li><strong>다운로드는 하지만 편집은 없다.</strong> 요청 스키마가 <code>.strict()</code>로 닫혀 있고 시작·끝·구간 같은 시간 파라미터가 전혀 없습니다. 클리핑 기능은 draft PR로 진행 중이나 "비효율적이고 로컬 처리와 UI가 미비하다"는 이유로 아직 병합되지 않았습니다.</li>
+      <li><strong>원본을 저장하지 않는다.</strong> 서버에 남는 것은 영상이 아니라 90초짜리 암호화된 스트림 메타데이터뿐입니다. README의 "캐시 없는 프록시"라는 서술은 코드와 일치합니다.</li>
+      <li><strong>프론트엔드와 처리 백엔드가 분리된다.</strong> 웹 UI(<code>web</code>)는 정적 사이트이고, 실제 다운로드 처리(<code>api</code>)는 별도 인스턴스입니다. 사용자는 웹은 공식 것을 쓰면서 처리 인스턴스만 자기 것으로 바꿀 수 있습니다.</li>
+    </ul>
+    <div class="callout">
+      <p class="k">핵심 대비</p>
+      <p>cobalt = 다운로드 프록시. clipman = 다운로드 + 편집 도구. cobalt가 하지 않는 바로 그 "편집"이 clipman의 존재 이유이자 난이도의 대부분입니다. 벤치마크는 다운로드 절반만 알려줄 뿐, 나머지 절반은 clipman이 새로 설계해야 합니다.</p>
+    </div>
+  </section>
+
+  <section id="code">
+    <div class="sechead"><span class="secno">02</span><h2>코드 구조</h2></div>
+    <p class="lede">pnpm 모노레포입니다. 별도 빌드 오케스트레이터(Turbo, Nx) 없이 워크스페이스 프로토콜로만 묶습니다. 관심사가 폴더로 깔끔하게 갈립니다.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>워크스페이스</th><th>역할</th><th>기술</th><th>버전</th><th>라이선스</th></tr></thead>
+        <tbody>
+          <tr><td><code>api</code></td><td>다운로드 처리 서버</td><td>Node.js ESM (순수 JS, 빌드 단계 없음), Express</td><td class="num">11.7.1</td><td>AGPL-3.0</td></tr>
+          <tr><td><code>web</code></td><td>웹 UI (정적 SPA)</td><td>SvelteKit 2.55, Svelte 5, Vite 7, TypeScript</td><td class="num">11.7</td><td>CC-BY-NC-SA-4.0</td></tr>
+          <tr><td><code>packages/api-client</code></td><td>외부용 API 클라이언트 (사실상 스텁)</td><td>TypeScript (tsup), 소스 미커밋</td><td class="num">0.0.1</td><td>MIT</td></tr>
+          <tr><td><code>packages/version-info</code></td><td>버전·커밋 정보 헬퍼</td><td>Node ESM</td><td class="num">1.0.1</td><td>AGPL-3.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>백엔드 트리 (<code>api/src</code>)</h3>
+    <p class="muted">서비스 추출 로직을 플랫폼당 한 파일로 두고, <code>processing/match.js</code>가 라우팅하는 플러그인식 구조입니다.</p>
+    <div class="tree"><span class="c">api/src/</span>
+├─ cobalt.js            <span class="n"># 진입점: dotenv, API_URL 체크, 클러스터링</span>
+├─ config.js
+├─ <span class="c">core/</span>
+│   ├─ api.js           <span class="n"># Express 라우팅 + 미들웨어 파이프라인</span>
+│   ├─ env.js           <span class="n"># 환경변수 파싱</span>
+│   └─ itunnel.js       <span class="n"># 내부 전용 터널 (127.0.0.1)</span>
+├─ <span class="c">processing/</span>
+│   ├─ match.js         <span class="n"># host별 추출기 디스패치 (switch)</span>
+│   ├─ match-action.js  <span class="n"># 처리 유형 결정 (proxy/merge/remux...)</span>
+│   ├─ schema.js        <span class="n"># zod 요청 스키마 (.strict())</span>
+│   ├─ request.js       <span class="n"># 정규화 + 응답 생성</span>
+│   └─ <span class="c">services/</span>       <span class="n"># 21개 플랫폼 추출기 (youtube.js ...)</span>
+├─ <span class="c">security/</span>        <span class="n"># jwt · turnstile · api-keys · secrets</span>
+├─ <span class="c">stream/</span>          <span class="n"># stream · ffmpeg · proxy · internal · manage</span>
+├─ store/             <span class="n"># memory-store / redis-store (선택)</span>
+└─ util/              <span class="n"># test.js (추출기 통합 테스트 러너)</span></div>
+
+    <h3>프론트엔드 트리 (<code>web/src</code>)</h3>
+    <div class="tree"><span class="c">web/src/</span>
+├─ routes/
+│   ├─ +page.svelte    <span class="n"># 메인: Omnibox + 마스코트 + 지원목록뿐</span>
+│   ├─ settings/       <span class="n"># 10개 카테고리 (video, audio, instances...)</span>
+│   └─ remux/          <span class="n"># 브라우저 로컬 처리 화면</span>
+├─ components/         <span class="n"># save · queue · sidebar · dialog ...</span>
+└─ lib/
+    ├─ api/            <span class="n"># request(), 인스턴스 선택, 인증</span>
+    ├─ state/          <span class="n"># Svelte store (설정·테마·큐)</span>
+    ├─ storage/        <span class="n"># OPFS + 메모리 폴백</span>
+    ├─ task-manager/   <span class="n"># 로컬 처리 작업 큐 (Web Worker)</span>
+    └─ libav.ts        <span class="n"># ffmpeg의 WASM 빌드 래퍼</span></div>
+
+    <div class="callout">
+      <p class="k">테스트 전략 (참고)</p>
+      <p>cobalt의 테스트는 사실상 하나입니다. 21개 추출기를 <strong>실제 서비스 대상으로</strong> 돌려 "올바른 응답 상태(tunnel/redirect/error)를 반환하는가"만 확인하는 통합 테스트입니다(<code>api/src/util/test.js</code> + GitHub Actions matrix). 실제 다운로드 바이트 검증은 <code>// TODO: stream testing</code>으로 비어 있고, 웹 UI 테스트는 아예 없습니다(타입 체크만). 플랫폼이 API를 바꾸면 CI가 잡아내는, 미디어 추출 도구에 최적화된 회귀 방어 방식입니다.</p>
+    </div>
+  </section>
+
+  <section id="flow">
+    <div class="sechead"><span class="secno">03</span><h2>요청 흐름과 터널 모델</h2></div>
+    <p class="lede">cobalt는 다운로드 링크를 즉시 주지 않습니다. 대신 HMAC로 서명되고 90초 뒤 만료되는 임시 터널 URL을 돌려주고, 사용자가 그 URL을 다시 호출할 때 원본을 실시간으로 흘려보냅니다. 남용 방지와 무저장을 동시에 얻는 설계입니다.</p>
+
+    <div class="flow">
+      <div class="flow-inner">
+        <div class="fstep"><div class="fnode"><div class="ft">POST /</div><div class="fd">본문 <code>{ url, videoQuality, audioFormat, downloadMode ... }</code> 를 JSON으로 전송</div></div></div>
+        <div class="farrow"><span>↓</span></div>
+        <div class="fstep"><div class="fnode"><div class="ft">정규화 → extract(url) → match(service)</div><div class="fd">URL을 파싱해 어느 플랫폼인지 판별하고 해당 추출기를 호출</div></div></div>
+        <div class="farrow"><span>↓</span> 응답 status 5종으로 분기</div>
+        <div class="fbranch">
+          <div class="fnode"><div class="ft">tunnel</div><div class="fd">서명된 임시 URL. 서버가 프록시·remux 수행</div></div>
+          <div class="fnode"><div class="ft">redirect</div><div class="fd">원본 URL로 직행 (서버 미경유)</div></div>
+          <div class="fnode"><div class="ft">picker</div><div class="fd">다중 미디어 선택 목록</div></div>
+          <div class="fnode alt"><div class="ft">local-processing</div><div class="fd">remux·transcode를 브라우저가 수행</div></div>
+          <div class="fnode"><div class="ft">error / critical</div><div class="fd">코드 기반 오류</div></div>
+        </div>
+        <div class="farrow"><span>↓</span> tunnel 경로</div>
+        <div class="fstep"><div class="fnode"><div class="ft">GET /tunnel?id&amp;exp&amp;sig&amp;sec&amp;iv</div><div class="fd">HMAC 서명 검증(<code>verifyStream</code>) + 만료 확인 후에만 통과</div></div></div>
+        <div class="farrow"><span>↓</span></div>
+        <div class="fstep"><div class="fnode"><div class="ft">내부 터널 /itunnel (127.0.0.1, 랜덤 포트)</div><div class="fd">원본 서버에서 바이트를 당김. ffmpeg 입력도 파일이 아니라 이 내부 URL</div></div></div>
+        <div class="farrow"><span>↓</span></div>
+        <div class="fstep"><div class="fnode"><div class="ft">스트림 전달 (pipe)</div><div class="fd">원본을 그대로(proxy) 또는 ffmpeg를 거쳐(remux) 클라이언트로 흘림. 디스크 미경유</div></div></div>
+      </div>
+    </div>
+
+    <h3>인증은 3층으로 겹칩니다</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>계층</th><th>무엇</th><th>동작</th><th>기본값</th></tr></thead>
+        <tbody>
+          <tr><td>Turnstile</td><td>Cloudflare 캡차</td><td>봇 검증 통과 시 <code>POST /session</code>이 JWT 발급</td><td>선택</td></tr>
+          <tr><td>JWT</td><td>세션 토큰</td><td>페이로드에 클라이언트 IP 해시를 넣어 다른 IP에서 도용 불가</td><td class="num">120초 만료</td></tr>
+          <tr><td>API key</td><td>UUID 키</td><td><code>Api-Key &lt;uuid&gt;</code> 헤더. 키별 서비스·IP·한도 제한</td><td>선택</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">여기에 요청·세션·터널용 rate limit 3종이 더해지고, 여러 인스턴스로 확장하면 Redis로 상태를 공유합니다. 전부 <strong>불특정 다수의 남용을 막기 위한 장치</strong>입니다.</p>
+  </section>
+
+  <section id="media">
+    <div class="sechead"><span class="secno">04</span><h2>미디어 처리 내부</h2></div>
+    <p class="lede">cobalt가 영상에 손대는 정도는 최소한입니다. 비디오는 거의 항상 재인코딩 없이 컨테이너만 바꾸고, 실제 인코딩은 오디오 변환과 gif에서만 일어납니다. 전 과정이 디스크를 거치지 않는 스트리밍입니다.</p>
+
+    <div class="grid2">
+      <div class="card"><h4><span class="tag code">proxy</span> 원본 그대로</h4><p>undici로 원본을 열어 그대로 <code>pipe</code>. 재인코딩·remux 없음. 클라이언트 Range 헤더를 원본에 그대로 전달해 구간 요청도 통과.</p></div>
+      <div class="card"><h4><span class="tag code">remux / merge</span> 컨테이너만</h4><p>ffmpeg로 처리하되 비디오는 항상 <code>-c:v copy</code>(무재인코딩). merge는 분리된 영상·음성 스트림을 <code>-map</code>으로 합침. mp4는 <code>faststart</code> 적용.</p></div>
+      <div class="card"><h4><span class="tag code">audio / gif</span> 실제 인코딩</h4><p>오디오 포맷·비트레이트 변환과 gif 팔레트 렌더링에서만 진짜 인코딩. gif가 가장 무거움.</p></div>
+      <div class="card"><h4><span class="tag code">local-processing</span> 브라우저로 위임</h4><p>서버 부하가 큰 처리를 클라이언트로 넘김. 브라우저는 <strong>libav.js(ffmpeg의 WASM 빌드)</strong>를 Web Worker에서 돌려 remux·transcode 수행, 결과는 OPFS에 저장.</p></div>
+    </div>
+
+    <p>ffmpeg 바이너리는 npm 패키지 <code>ffmpeg-static</code>으로 <strong>번들</strong>됩니다(별도 설치 불필요). 입력은 임시 파일이 아니라 내부 터널 URL이고 출력은 파이프(<code>pipe:3</code>)라, 결과물이 서버 디스크에 절대 쓰이지 않습니다. 대용량도 8MB 청크 제너레이터로 흘려 상수에 가까운 메모리로 처리합니다.</p>
+
+    <pre><code># remux (컨테이너 재포장, 무재인코딩) 개념
+ffmpeg -i &lt;video-tunnel&gt; -i &lt;audio-tunnel&gt; \
+  -map 0:v -c:v copy  -map 1:a -c:a copy \
+  -movflags +faststart+frag_keyframe+empty_moov  pipe:3</code></pre>
+
+    <div class="callout warn">
+      <p class="k">clipman과의 결정적 차이</p>
+      <p>cobalt는 <code>-c:v copy</code>로 "손대지 않고 다시 포장"만 합니다. clipman의 쇼츠 편집(구간 자르기, 세로 9:16 크롭·스케일)은 <strong>반드시 비디오를 재인코딩</strong>해야 합니다. 즉 clipman은 cobalt가 의도적으로 피한 무거운 경로를 정면으로 다뤄야 하며, 그래서 처리를 로컬 PC에서 하는 결정이 더욱 타당합니다.</p>
+    </div>
+  </section>
+
+  <section id="youtube">
+    <div class="sechead"><span class="secno">05</span><h2>YouTube 추출의 현실</h2></div>
+    <p class="lede">YouTube는 21개 서비스 중 유일하게 다른 방식을 씁니다. 그리고 cobalt가 공개 서비스에서 YouTube를 사실상 접은 이유가, clipman의 로컬 우선 전략을 정당화하는 가장 강력한 근거입니다.</p>
+
+    <ul class="clean">
+      <li><strong>라이브러리:</strong> YouTube만 <code>youtubei.js</code>(innertube, YouTube 내부 API 클라이언트)를 사용합니다. 나머지는 HTML 안의 JSON 파싱이나 내부 REST/GraphQL 호출입니다.</li>
+      <li><strong>클라이언트·코덱:</strong> 기본 <code>IOS</code> 클라이언트, 코덱은 h264·av1·vp9 중 선택, 화질은 144p부터 4320p까지. 1080p 초과에서는 <code>WEB_EMBEDDED</code> + 세션 토큰 경로로 전환합니다.</li>
+      <li><strong>봇가드 우회:</strong> 높은 화질이나 봇 차단 상황에서는 별도 세션 서버(<code>yt-session-generator</code>)가 만든 poToken과 visitor_data가 필요합니다. 쿠키(<code>cookies.json</code>)는 선택이지만 인증이 필요한 콘텐츠에 씁니다.</li>
+    </ul>
+
+    <div class="callout clip">
+      <p class="k">clipman에 직결되는 사실</p>
+      <p>cobalt 메인테이너는 공개 인스턴스의 YouTube 지원 중단 원인을 이렇게 밝혔습니다(Issue #1356): "YouTube의 강한 네트워크 제한이 여전하고, <strong>우리 규모(중앙 프록시 서버)</strong>에서는 이를 우회할 수 없다." 법적 조치가 아니라 대규모 중앙 서버를 겨냥한 기술적 차단입니다. clipman은 사용자 PC(가정용 IP)에서 본인 쿠키로 동작하므로 <strong>바로 그 문제를 구조적으로 회피</strong>합니다. 이것은 로컬 우선 설계의 부가 효과가 아니라 핵심 이점입니다. (분석·추론, 근거: Issue #1356 + 로컬 다운로더의 동작 방식)</p>
+    </div>
+  </section>
+
+  <section id="web">
+    <div class="sechead"><span class="secno">06</span><h2>프론트엔드</h2></div>
+    <p class="lede">벤치마크로 삼을 부분은 UI의 절제된 단순함입니다. 메인 화면에는 입력창 하나와 마스코트, 지원 목록뿐입니다.</p>
+    <ul class="clean">
+      <li><strong>메인은 Omnibox 하나.</strong> URL을 붙여넣는 단일 입력이 전부이고, 세부 옵션은 <code>/settings</code>의 10개 카테고리로 숨깁니다. clipman의 "첫 화면은 입력창 하나" 방향과 정확히 일치합니다.</li>
+      <li><strong>설정은 localStorage.</strong> 사용자 설정을 JSON으로 <code>localStorage</code>에 저장하고 스키마 버전 기반으로 자동 마이그레이션합니다(IndexedDB 아님).</li>
+      <li><strong>테마는 3모드.</strong> auto·light·dark. auto는 OS 선호를 실시간 감지합니다.</li>
+      <li><strong>인스턴스 선택.</strong> 웹 UI가 처리 대상 API 인스턴스를 설정에서 바꿀 수 있습니다. 프론트와 백엔드가 느슨하게 결합된 구조라 가능합니다.</li>
+      <li><strong>PWA이나 오프라인은 없음.</strong> 설치형 매니페스트는 있지만 서비스워커가 없어 오프라인 캐싱은 지원하지 않습니다.</li>
+    </ul>
+  </section>
+
+  <section id="host">
+    <div class="sechead"><span class="secno">07</span><h2>셀프호스팅과 운영</h2></div>
+    <p class="lede">배포는 Docker Compose 한 벌로 끝나고, 반드시 설정할 것은 <code>API_URL</code> 하나뿐입니다. 나머지 30여 개 환경변수는 전부 선택입니다.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>구성</th><th>이미지·역할</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>cobalt (api)</td><td><code>ghcr.io/imputnet/cobalt:11</code></td><td>읽기 전용 파일시스템, 비루트 실행, 포트 9000</td></tr>
+          <tr><td>watchtower</td><td>이미지 자동 업데이트</td><td class="num">15분 간격</td></tr>
+          <tr><td>yt-session-generator</td><td>YouTube poToken 생성</td><td>기본 주석 처리 (선택)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>주요 환경변수</th><th>의미</th><th>기본값</th></tr></thead>
+        <tbody>
+          <tr><td><code>API_URL</code></td><td>인스턴스 공개 URL (유일한 필수 값)</td><td class="num">-</td></tr>
+          <tr><td><code>DURATION_LIMIT</code></td><td>처리 가능 최대 길이</td><td class="num">10800s (3h)</td></tr>
+          <tr><td><code>TUNNEL_LIFESPAN</code></td><td>터널 메타데이터 수명</td><td class="num">90s</td></tr>
+          <tr><td><code>API_INSTANCE_COUNT</code></td><td>다중 워커 (Redis 필수)</td><td class="num">1</td></tr>
+          <tr><td><code>FORCE_LOCAL_PROCESSING</code></td><td>클라이언트 처리 강제</td><td class="num">never</td></tr>
+          <tr><td><code>COOKIE_PATH</code></td><td>인증 서비스용 쿠키 파일</td><td class="num">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">공개 노출 시 리버스 프록시(nginx)와 Turnstile 또는 API 키 보호를 권장합니다. 공식 팀은 공개 API를 제공하지 않고 각자 호스팅하도록 안내합니다.</p>
+  </section>
+
+  <section id="legal">
+    <div class="sechead"><span class="secno">08</span><h2>라이선스와 법적 태도</h2></div>
+    <p class="lede">단일 라이선스가 아니라 컴포넌트별로 갈립니다. clipman이 코드를 참고할 때 반드시 알아야 할 경계입니다.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>컴포넌트</th><th>라이선스</th><th>clipman에 주는 의미</th></tr></thead>
+        <tbody>
+          <tr><td><code>api</code> (서버)</td><td>AGPL-3.0</td><td>네트워크 제공 시 소스 공개 의무. 강한 카피레프트</td></tr>
+          <tr><td><code>web</code> (UI)</td><td>CC-BY-NC-SA-4.0</td><td><strong>비상업 조건.</strong> UI 코드를 가져다 쓰지 말 것</td></tr>
+          <tr><td><code>packages/api-client</code></td><td>MIT</td><td>관대하나 사실상 미구현 스텁</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>브랜딩·마스코트·이름은 어느 라이선스에도 포함되지 않는 별도 저작물이며, 개조판을 만들 때는 이름을 포함한 모든 브랜딩을 제거해야 합니다. 프로젝트는 "무책임(zero liability), 사용자 책임, 캐시 안 함, 피라시 도구가 아님"을 명시적으로 선언합니다. 브라우저 개발자도구로도 같은 콘텐츠를 받을 수 있다는 논리로 정당성을 주장합니다.</p>
+    <div class="callout clip">
+      <p class="k">clipman 결론</p>
+      <p>cobalt의 <strong>UI 코드는 재사용 불가</strong>(비상업 + 브랜딩 제거)입니다. 참고만 하고 화면은 자체 제작해야 합니다. 다만 clipman은 개인·로컬 도구이므로 배포에 따르는 라이선스 부담 자체가 거의 발생하지 않습니다.</p>
+    </div>
+  </section>
+
+  <section id="clipman">
+    <div class="sechead"><span class="secno">09</span><h2>clipman 시사점</h2></div>
+    <p class="lede">아래는 코드 분석에서 끌어낸 판단입니다(사실이 아니라 분석). cobalt에서 무엇을 그대로 따르고, 무엇을 버리며, 무엇을 새로 만들어야 하는지를 정리합니다.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>항목</th><th>cobalt 방식</th><th>clipman 판단</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>단일 입력 UI</td><td>Omnibox 하나 + 설정 분리</td><td>그대로 차용. 첫 화면은 URL 입력 하나</td><td><span class="verdict v-keep">차용</span></td></tr>
+          <tr><td>ffmpeg 번들</td><td><code>ffmpeg-static</code> 동봉</td><td>동일 채택 (파이썬 static-ffmpeg류). 설치 마찰 제거</td><td><span class="verdict v-keep">차용</span></td></tr>
+          <tr><td>다운로드 엔진</td><td>youtubei.js (Node innertube)</td><td>파이썬 <code>yt-dlp</code>로 대체. 로컬·잦은 갱신에 유리</td><td><span class="verdict v-keep">대체</span></td></tr>
+          <tr><td>무거운 처리 위치</td><td>서버 ffmpeg 기본, 브라우저 WASM은 옵션</td><td>로컬 네이티브 ffmpeg. 가장 빠름</td><td><span class="verdict v-keep">차용</span></td></tr>
+          <tr><td>서명 터널·HMAC</td><td>90초 서명 URL + 내부 터널</td><td>불필요. 로컬 단일 사용자는 파일 경로 + 작업 폴링으로 충분</td><td><span class="verdict v-drop">제거</span></td></tr>
+          <tr><td>3층 인증·rate limit</td><td>Turnstile·JWT·API key·Redis</td><td>불필요. 남용 방지 대상이 없음</td><td><span class="verdict v-drop">제거</span></td></tr>
+          <tr><td>UI 코드</td><td>SvelteKit (CC-BY-NC-SA)</td><td>재사용 불가. 자체 제작 (참고만)</td><td><span class="verdict v-drop">제거</span></td></tr>
+          <tr><td>영상 편집</td><td>없음 (draft PR 진행 중)</td><td><strong>clipman이 새로 만드는 핵심.</strong> trim + 9:16 재인코딩</td><td><span class="verdict v-drop">신규</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>가장 중요한 세 가지 교훈</h3>
+    <ul class="clean clip">
+      <li><strong>편집이 곧 차별점임이 코드로 확정됐다.</strong> cobalt는 다운로드에 특화됐고 편집은 의도적으로(또는 미성숙으로) 비어 있습니다. clipman의 "다운로드에서 쇼츠 완성까지 한 흐름"이라는 존재 이유가 검증됐습니다.</li>
+      <li><strong>로컬 우선이 YouTube 차단을 구조적으로 피한다.</strong> cobalt가 규모 때문에 겪은 중앙 서버 차단을, 로컬 도구는 애초에 겪지 않습니다. 법적 리스크뿐 아니라 기술적 견고성 면에서도 로컬이 유리합니다.</li>
+      <li><strong>cobalt의 복잡성 절반은 clipman에 불필요하다.</strong> 터널 서명, 다층 인증, Redis, 인스턴스 분리는 전부 공개 멀티유저 남용 방지용입니다. clipman은 이 절반을 걷어내고 그 예산을 편집 UX에 쓰면 됩니다(1루타 전략).</li>
+    </ul>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <p><strong>근거와 신뢰도.</strong> 이 분석은 2026년 9월 기준 <code>imputnet/cobalt</code> main 브랜치의 코드 원문(raw.githubusercontent.com)과 공식 문서를 1차 출처로 삼았습니다. 7개 축을 병렬 조사한 뒤 완결성 비평과 공백 보충을 거쳤고, 대부분 항목이 높은 신뢰도(코드 직접 확인)입니다. clipman 시사점은 사실이 아니라 분석·추론이며 그렇게 표시했습니다.</p>
+    <p class="muted">주요 출처</p>
+    <div class="srcgrid">
+      github.com/imputnet/cobalt<br>
+      /api/src/core/api.js<br>
+      /api/src/stream/ffmpeg.js<br>
+      /api/src/stream/manage.js<br>
+      /api/src/processing/schema.js<br>
+      /api/src/processing/services/youtube.js<br>
+      /web/src/lib/libav.ts<br>
+      /docs/api.md · /docs/api-env-variables.md<br>
+      /docs/run-an-instance.md<br>
+      issues/1356 · pulls/1380 (편집 기능)
+    </div>
+    <p class="disclaim">clipman 내부 기획 참고용 문서입니다. cobalt는 imput(imputnet)의 저작물이며 본 페이지는 공개 오픈소스 코드에 대한 기술 분석입니다.</p>
+  </div>
+</footer>
