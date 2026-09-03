@@ -1,6 +1,6 @@
 # clipman 핸드오프 (Windows 기획 세션 -> macOS 개발 세션)
 
-- 작성일: 2026-09-01 (KST)
+- 작성일: 2026-09-01 (KST) / 갱신: 2026-09-03 (M0 착수 관문 판정 반영)
 - 배경: 기획과 개발 아키텍처 확정까지를 Windows PC에서 완료했고, 이후 개발은 macOS(맥북)에서 이어간다.
 - 진본 위치: GitHub `blazethrottle/clipman` (SSH). macOS에서 `git clone` 후 아래 순서로 읽고 시작한다.
 
@@ -16,35 +16,42 @@ YouTube 영상을 받아 세로 9:16 쇼츠로 편집하는 개인용 로컬 도
 - Web vs App 판단: 로컬 웹앱 확정. yt-dlp/ffmpeg는 번들 실행파일 + subprocess 호출로 확정(취소, 자체 업데이트, 실행 모델 통일 때문)
 - git 초기화 + 최초 커밋 + GitHub 푸시 완료
 
-## 3. 미완료 작업 (다음 즉시 착수 지점)
+## 3. 진행 상태 (2026-09-03 갱신)
 
-1. **구현 계획 수립(writing-plans)이 아직 안 됨.** 맥 세션의 첫 작업으로 권장. 아키텍처 문서를 입력으로 파일별 작업 순서와 TDD 단위를 만든다.
-2. 그 전에 아래 "재심 대상 전제"의 macOS 적응을 먼저 판정할 것(구현 세부가 Windows에 맞춰져 있음).
-3. 구현 착수 시 첫 수직 슬라이스 권장 순서: (a) `wrappers/`(binaries 경로 해석 -> ffprobe 메타 -> yt-dlp 다운로드 -> ffmpeg 크롭) 순수 어댑터부터 TDD, (b) `jobs/manager.py` 인메모리 레지스트리, (c) `services/`, (d) FastAPI 라우터, (e) Svelte UI.
+M0(착수 관문) 완료. 관문 4개가 모두 닫혔다.
 
-## 4. 재심 대상 전제 (macOS 세션이 반드시 의심하고 확인할 것)
-
-아키텍처 문서 결론은 제약이 아니라 재심 가능한 상태로 물려준다. 특히 아래는 Windows 전제라 macOS에서 반드시 바꾸거나 재검증해야 한다.
-
-| 전제 | Windows 결정 | macOS에서 할 일 |
+| 관문 | 상태 | 산출물 |
 |---|---|---|
-| 번들 바이너리 이름 | `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe` | 확장자 없는 `yt-dlp`, `ffmpeg`, `ffprobe`. `binaries.py`에서 `sys.platform` 분기로 이름 결정(크로스플랫폼) |
-| ffmpeg 번들 소스 | gyan.dev/BtbN 정적 빌드(Windows) | macOS 정적 빌드(evermeet.cx 등) 또는 Homebrew. Apple Silicon(arm64)/Intel 구분 확인 |
-| 실행기 | `start.cmd` (더블클릭) | `start.command` 또는 shell 스크립트 + `chmod +x`. Gatekeeper 첫 실행 경고 감안 |
-| 이벤트 루프 함정 | ProactorEventLoop 주의(Windows 전용) | macOS엔 해당 없음. 단 `run_in_executor + subprocess.Popen` 실행 모델 자체는 크로스플랫폼이라 그대로 유지 |
-| 쿠키 폴백 | `--cookies-from-browser chrome` + App-Bound Encryption 회피 | macOS는 Safari/Chrome 대상, Keychain 접근 권한 프롬프트 발생 가능. `--cookies` 파일 폴백 우선은 동일 |
-| 경로 처리 | 일부 역슬래시/`.exe` 하드코딩 | `pathlib`/`os.path`로 통일, 하드코딩 제거 |
-| v2 패키징 | PyInstaller onefile(Windows) | macOS는 `.app` 번들 + 코드서명/공증(notarization) 이슈. v2 범위라 지금은 보류 |
+| 사용자 사인오프 | **완료** | design/architecture 문서 상태 줄 갱신 |
+| macOS 재심 전제 7건 판정 | **완료** | 이 문서 4절 확정 판정 열 |
+| 아키텍처 정본 크로스플랫폼 정정 | **완료** | architecture 1, 2, 3, 7, 9, 13절 |
+| 구현 계획 수립(writing-plans) | **완료** | `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` |
 
-아키텍처 문서 15절의 기존 재심 항목(번들 ffmpeg 실제 버전에서 필터/컷/오디오 유지 통합 테스트, `player_client` 조합 변동, 포트 자동 선택 배선)도 그대로 유효하다.
+구현 순서는 계획서가 정본이며, 원 권장안(첫 수직 슬라이스: `wrappers/` 순수 어댑터 TDD -> `jobs/manager.py` -> `services/` -> FastAPI 라우터 -> Svelte UI)을 그대로 승계했다.
 
-**권장 방향:** 지금 구조는 `binaries.py`의 `sys.platform` 분기와 실행기 파일만 OS별로 두면 크로스플랫폼이 된다. macOS 전용으로 좁히기보다 크로스플랫폼으로 두는 편이 Windows 원 PC와의 왕복에도 유리하다.
+## 4. 재심 대상 전제 (판정 완료, 2026-09-03)
+
+아키텍처 문서 결론은 제약이 아니라 재심 가능한 상태로 물려받았고, 2026-09-03에 7건 전부를 단일 답으로 확정했다. **대상 플랫폼 확정: macOS 1순위 + Windows 병행(크로스플랫폼 유지).** 근거는 원 PC(Windows)와의 왕복 가능성이고, 비용은 `binaries.py`의 `sys.platform` 분기와 실행기 파일 2개뿐이다.
+
+| 전제 | Windows 결정 | 확정 판정 (2026-09-03) |
+|---|---|---|
+| 번들 바이너리 이름 | `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe` | **확정**: `binaries.py`가 `sys.platform`으로 분기. `win32`면 `.exe` 접미, 그 외(darwin/linux)는 확장자 없음. 이름 상수는 단일 지점에만 둔다 |
+| ffmpeg 번들 소스 | gyan.dev/BtbN 정적 빌드(Windows) | **확정**: 조달 우선순위를 1순위 정적 빌드 다운로드, 2순위 Homebrew 설치본 복사로 고정. 조달 스크립트가 `uname -m`으로 arm64/x86_64를 판별한다. 조달 결과(출처 URL, 버전, SHA256)는 `bin/`이 gitignore이므로 `docs/binaries-manifest.md`에 기록한다 |
+| 실행기 | `start.cmd` (더블클릭) | **확정**: `start.command`(macOS, `chmod +x` 필요)와 `start.cmd`(Windows) 두 파일을 모두 저장소 루트에 둔다. Gatekeeper 첫 실행은 우클릭 열기 1회 안내로 처리 |
+| 이벤트 루프 함정 | ProactorEventLoop 주의(Windows 전용) | **확정(변경 없음)**: macOS 해당 없음. `run_in_executor` + 동기 `subprocess.Popen` 실행 모델은 크로스플랫폼이므로 그대로 유지 |
+| 쿠키 폴백 | `--cookies-from-browser chrome` + App-Bound Encryption 회피 | **확정**: 폴백 순서를 (1) `--cookies FILE`(사용자가 내보낸 쿠키 파일), (2) `--cookies-from-browser`(macOS는 chrome, safari 순), (3) `player_client` 교체, (4) yt-dlp 업데이트 안내로 고정. Keychain 권한 프롬프트는 실측 대상으로 M1에 남긴다 |
+| 경로 처리 | 일부 역슬래시/`.exe` 하드코딩 | **확정**: 내부 경로는 전부 `pathlib.Path`. 문자열 결합 금지, subprocess 인자로 넘길 때만 `str()` 변환. `.exe` 하드코딩은 아키텍처 9절에서 제거 완료 |
+| v2 패키징 | PyInstaller onefile(Windows) | **확정(보류 유지)**: macOS `.app` 번들 + 코드서명/공증은 v2 범위. v1에서는 다루지 않는다 |
+
+아키텍처 문서 15절의 기존 재심 항목(번들 ffmpeg 실제 버전에서 필터/컷/오디오 유지 통합 테스트, `player_client` 조합 변동, 포트 자동 선택 배선)은 여전히 실측 대상이며, 구현 계획(`docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md`)의 명시적 검증 태스크로 편입했다.
 
 ## 5. 관련 파일 인덱스
 
 - `README.md` : 프로젝트 개요, 로드맵
-- `docs/superpowers/specs/2026-09-01-clipman-design.md` : 서비스/UI/UX/개념 아키텍처(읽기 1순위)
-- `docs/superpowers/specs/2026-09-01-clipman-architecture.md` : 개발 아키텍처 확정본(읽기 2순위, 구현의 근거)
+- `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` : v1 구현 계획(읽기 1순위, 무엇을 어떤 순서로 만드는지)
+- `docs/superpowers/specs/2026-09-01-clipman-architecture.md` : 개발 아키텍처 확정본(읽기 2순위, **API 계약과 폴더 구조의 정본**)
+- `docs/superpowers/specs/2026-09-01-clipman-design.md` : 서비스/UI/UX 기획 정본(읽기 3순위, 제품 의도와 화면 흐름)
+- `docs/binaries-manifest.md` : 번들 실행파일 조달 기록(출처, 버전, SHA256). `bin/`이 gitignore이므로 이 파일이 유일한 추적 수단
 - `docs/cobalt-analysis.html` : 벤치마크 분석(참고)
 - `.gitignore` : `bin/`, `work/`, `output/`, `logs/`, venv, node_modules 제외
 
@@ -57,9 +64,11 @@ YouTube 영상을 받아 세로 9:16 쇼츠로 편집하는 개인용 로컬 도
 - v1은 최소(다운로드 + 자르기 + 세로 변환). blur_pad(흐린 배경)는 v1.1, 자막은 v2, 하이라이트는 v3.
 - 비개발자 사용자다. 설치와 실행은 Claude가 대행하고 사용자는 더블클릭만 한다.
 
-## 7. macOS 세션 시작 방법
+## 7. macOS 세션 시작 방법 (2026-09-03 갱신)
+
+M0가 끝났으므로 시작 절차가 바뀌었다.
 
 1. `git clone git@github.com:blazethrottle/clipman.git` 후 폴더 진입.
-2. 이 문서 -> design spec -> architecture 순으로 읽는다(R1 선행자료 게이트).
-3. 4절 재심 전제(특히 바이너리/실행기/경로)를 먼저 판정한다.
-4. writing-plans로 구현 계획을 만든 뒤 사용자와 합의하고 착수한다.
+2. 이 문서 -> 구현 계획서 -> architecture 순으로 읽는다(R1 선행자료 게이트). design spec은 제품 의도 확인용으로 필요할 때 읽는다.
+3. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
+4. 계획서의 마일스톤 순서대로 착수한다. 바이너리 없이도 통과하는 단위 테스트(인자 조립, 경로 해석, 파싱)는 이미 작성돼 있으므로, macOS에서는 실물 바이너리가 필요한 통합 테스트(`@pytest.mark.integration`)부터 확인한다.

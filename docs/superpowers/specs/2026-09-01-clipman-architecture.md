@@ -1,7 +1,8 @@
 # clipman 개발 아키텍처 (Development Architecture)
 
 - 작성일: 2026-09-01 (KST), 적대적 리뷰(4개 렌즈) 반영 확정본
-- 상태: 확정안 (스택 사실 검증 + 적대적 리뷰 완료, 사용자 사인오프 대기)
+- 상태: **사인오프 완료 (2026-09-03)**. 스택 사실 검증 + 적대적 리뷰 완료 후 사용자 승인. 이 문서가 구현의 정본이다.
+- 정정 이력: 2026-09-03에 대상 플랫폼을 macOS 1순위 + Windows 병행(크로스플랫폼)으로 확정하고, Windows 전제로 남아 있던 서술(`.exe` 하드코딩, `start.cmd` 단독, 1절/3절 표현)을 정정했다. 판정 근거는 `docs/HANDOFF.md` 4절.
 - 상위 문서: `2026-09-01-clipman-design.md` (서비스/UI/UX/개념 아키텍처)
 - 근거: 스택 5개 영역 병렬 검증(공식 문서 확인) + 4개 렌즈 적대적 리뷰. 버전과 명령은 2026-09 시점 확인값
 
@@ -15,11 +16,11 @@
 | 웹 프레임워크 | FastAPI + uvicorn | 최신 | 비동기, response_model 스키마 자동화 |
 | 검증 모델 | Pydantic v2 | 2.13.x | Literal 기반 enum, OpenAPI 자동 생성 |
 | 다운로드 | yt-dlp (**번들 실행파일, subprocess 호출**) | >=2026.8.19 | 취소 가능(프로세스 종료), 자체 업데이트, ffmpeg와 실행 모델 통일 |
-| 미디어 처리 | ffmpeg + ffprobe (번들 실행파일) | gyan.dev/BtbN 정적 8.x | ffprobe 동봉, 오프라인 견고, 버전 고정 |
+| 미디어 처리 | ffmpeg + ffprobe (번들 실행파일) | 정적 빌드 8.x (macOS: 정적 빌드 또는 Homebrew 복사 / Windows: gyan.dev·BtbN) | ffprobe 동봉, 오프라인 견고, 버전 고정. 조달 기록은 `docs/binaries-manifest.md` |
 | 프론트엔드 | Svelte 5 + Vite (순수 SPA) | Vite 7.x 고정 권장 | 단일 화면에 SvelteKit은 과잉 |
 | 테스트 | pytest + httpx(TestClient) + pytest-subprocess | 최신 | subprocess 모킹, 엔드포인트 통합 |
 
-**핵심 전환(리뷰 반영):** yt-dlp를 파이썬 라이브러리가 아니라 번들 실행파일(`yt-dlp.exe`)로 subprocess 호출한다. 이유는 세 가지가 한 번에 해결되기 때문이다. (1) 취소: 라이브러리를 스레드에서 돌리면 `task.cancel()`로 실제 다운로드를 멈출 수 없지만, 실행파일은 프로세스 핸들을 `terminate()`하면 즉시 멈춘다. (2) 업데이트: `yt-dlp.exe -U` 한 줄로 자체 갱신된다(봇 차단 대응의 핵심). (3) 통일: ffmpeg와 동일한 subprocess + Popen + 진행률 파싱 + 취소 모델을 공유해 코드가 단순해진다. 메타데이터도 `yt-dlp -J`(JSON 덤프)로 제목, 길이, 썸네일, 화질 목록을 한 번에 얻는다.
+**핵심 전환(리뷰 반영):** yt-dlp를 파이썬 라이브러리가 아니라 번들 실행파일로 subprocess 호출한다. 이유는 세 가지가 한 번에 해결되기 때문이다. (1) 취소: 라이브러리를 스레드에서 돌리면 `task.cancel()`로 실제 다운로드를 멈출 수 없지만, 실행파일은 프로세스 핸들을 `terminate()`하면 즉시 멈춘다. (2) 업데이트: `yt-dlp -U` 한 줄로 자체 갱신된다(봇 차단 대응의 핵심). (3) 통일: ffmpeg와 동일한 subprocess + Popen + 진행률 파싱 + 취소 모델을 공유해 코드가 단순해진다. 메타데이터도 `yt-dlp -J`(JSON 덤프)로 제목, 길이, 썸네일, 화질 목록을 한 번에 얻는다.
 
 거부한 대안: yt-dlp 라이브러리(취소 불가, 업데이트 복잡), imageio-ffmpeg(ffprobe 미포함), static-ffmpeg(최초 실행 온라인 다운로드), BackgroundTasks(핸들/취소/진행률 없음), asyncio.create_subprocess_exec(Windows 이벤트 루프 함정), SvelteKit(단일 화면에 과잉), pydantic-settings(고정 경로 도구에 과한 설정 계층).
 
@@ -27,11 +28,11 @@
 
 ## 1. 시스템 개요
 
-전부 사용자 Windows PC 안에서 동작하는 로컬 3계층이다. 브라우저는 화면만, 로컬 파이썬 서버가 번들 실행파일을 호출해 무거운 처리를 한다.
+전부 사용자 PC 안에서 동작하는 로컬 3계층이다(macOS 1순위, Windows 병행). 브라우저는 화면만, 로컬 파이썬 서버가 번들 실행파일을 호출해 무거운 처리를 한다.
 
 ```
 [브라우저 SPA]  --HTTP(127.0.0.1:PORT)-->  [FastAPI 서버]  --subprocess-->  [번들 실행파일]
-  Svelte 빌드(dist)      /api 폴링              라우터/서비스/래퍼         yt-dlp.exe / ffmpeg.exe / ffprobe.exe
+  Svelte 빌드(dist)      /api 폴링              라우터/서비스/래퍼         yt-dlp / ffmpeg / ffprobe (Windows는 .exe)
   (FastAPI가 서빙)                             인메모리 Job 레지스트리
                                                      |
                                      [로컬 파일시스템]  work/<job>/ (원본 보존)   output/ (쇼츠 결과물)
@@ -49,45 +50,66 @@ cobalt에서 걷어낸 것: 서명 터널, 다층 인증, Redis, 인스턴스 �
 clipman/
 ├─ backend/
 │  ├─ app/
+│  │  ├─ __init__.py        # 패키지 표식 (python -m app.main 실행에 필요)
 │  │  ├─ main.py            # 앱 생성, 라우터/예외핸들러 등록, dist 서빙, 포트 선택, 브라우저 열기, 로깅
-│  │  ├─ paths.py           # 앱 루트 기준 경로 상수(bin/work/output/logs). 단순 모듈(pydantic-settings 미사용)
+│  │  ├─ paths.py           # 앱 루트 기준 경로 상수(bin/work/output/logs). pathlib.Path 기반 단순 모듈
 │  │  ├─ schemas.py         # 요청/응답 Pydantic 모델
 │  │  ├─ errors.py          # 소수의 동작-분기 에러 코드 + 한국어 메시지 룩업
 │  │  ├─ routers/
+│  │  │  ├─ __init__.py
 │  │  │  ├─ metadata.py     # POST /api/metadata
 │  │  │  ├─ jobs.py         # 다운로드/상태/취소/export/source/reveal
 │  │  │  └─ system.py       # POST /api/system/update-ytdlp
 │  │  ├─ services/
+│  │  │  ├─ __init__.py
 │  │  │  ├─ download.py     # yt-dlp 오케스트레이션(유스케이스)
-│  │  │  └─ edit.py         # ffmpeg 오케스트레이션(유스케이스)
+│  │  │  ├─ edit.py         # ffmpeg 오케스트레이션(유스케이스)
+│  │  │  └─ files.py        # 저장 경로 관리 + 결과 폴더 열기(OS 분기: open/explorer/xdg-open)
 │  │  ├─ jobs/
+│  │  │  ├─ __init__.py
 │  │  │  └─ manager.py      # 인메모리 Job 레지스트리, 상태/진행률, 취소
 │  │  └─ wrappers/          # 외부 실행파일 저수준 어댑터 (순수, 테스트 쉬움)
-│  │     ├─ ytdlp.py        # yt-dlp 인자 조립 + Popen 실행 + 진행률 파싱
+│  │     ├─ __init__.py
+│  │     ├─ ytdlp.py        # yt-dlp 인자 조립 + Popen 실행 + 진행률 파싱 + player_client 폴백 상수
 │  │     ├─ ffmpeg.py       # ffmpeg 필터그래프 조립 + Popen 실행 + 진행률 파싱
-│  │     ├─ ffprobe.py      # 소스 메타(해상도/길이) 조회
-│  │     └─ binaries.py     # 번들 실행파일 경로 해석
+│  │     ├─ ffprobe.py      # 소스 메타(해상도/길이/오디오 유무) 조회
+│  │     └─ binaries.py     # 번들 실행파일 경로 해석 (sys.platform 분기)
+│  ├─ tests/                # pytest. 단위 테스트는 바이너리 없이 통과해야 한다
+│  │  ├─ test_binaries.py
+│  │  ├─ test_ffprobe.py
+│  │  ├─ test_ffmpeg.py
+│  │  ├─ test_ytdlp.py
+│  │  ├─ test_jobs.py
+│  │  ├─ test_api.py
+│  │  └─ integration/       # @pytest.mark.integration : 실물 바이너리 필요, 기본 스위트 제외
+│  ├─ pyproject.toml        # pytest 설정(마커, 경로). 빌드 도구 용도 아님
 │  └─ requirements.txt
 ├─ frontend/                # Svelte + Vite 소스
 │  └─ dist/                 # Vite 빌드 산출물 → FastAPI가 서빙 (배포 전 1회 빌드 필요)
-├─ bin/                     # 번들 실행파일: yt-dlp.exe, ffmpeg.exe, ffprobe.exe
+├─ bin/                     # 번들 실행파일: yt-dlp, ffmpeg, ffprobe (Windows는 .exe). gitignore
 ├─ work/                    # 작업별 폴더 work/<job_id>/ : 다운로드 원본 보존 + 인코딩 임시
 ├─ output/                  # 최종 쇼츠 결과물 (사용자가 얻는 곳)
 ├─ logs/                    # clipman.log (진단용)
-└─ start.cmd                # 더블클릭 실행기 (실패 시 콘솔 유지)
+├─ start.command            # 더블클릭 실행기 (macOS, chmod +x)
+└─ start.cmd                # 더블클릭 실행기 (Windows, 실패 시 콘솔 유지)
 ```
 
 3계층 책임: `wrappers/`는 실행파일을 어떻게 부르는가(인자, 진행률 파싱)만, `services/`는 무엇을 어떤 순서로(유스케이스), `routers/`는 HTTP 껍데기. 이 경계가 로드맵(v2 자막, v3 하이라이트)을 국소 추가로 흡수한다.
 
+정정 반영(2026-09-03):
+- `services/files.py` 신설. 상위 설계 문서 3.2의 `files` 컴포넌트(저장 경로 관리, 결과 폴더 열기)가 이 트리에 대응 모듈이 없었다. `reveal` 엔드포인트가 라우터에서 직접 subprocess를 부르면 3계층 경계가 첫 기능부터 깨지므로 서비스 계층에 둔다. OS 분기는 macOS `open`, Windows `explorer`, Linux `xdg-open`.
+- `tests/`와 `__init__.py`를 트리에 명시. 12절이 테스트 전략을 확정했으나 파일 위치가 없어 첫 테스트에서 즉흥 결정이 될 자리였다. **단위 테스트는 번들 바이너리 없이 통과해야 하고**, 실물이 필요한 것은 `tests/integration/`에 `@pytest.mark.integration`으로 격리한다.
+- `player_client` 폴백 목록의 위치를 `wrappers/ytdlp.py` 모듈 상수로 확정. 15절 재심이 "설정으로 뺀다"고 했으나 0절이 별도 설정 계층(pydantic-settings)을 거부했으므로, 값이 자주 바뀌는 문제는 "한 곳에만 둔다"로 해결한다. 설정 파일 계층은 만들지 않는다.
+
 ---
 
-## 3. 런타임 실행 모델 (Windows 검증 반영)
+## 3. 런타임 실행 모델 (크로스플랫폼. Windows 검증 결과를 그대로 유지)
 
 1. **uvicorn 단일 워커, reload 없음.**
    ```python
    uvicorn.run(app, host="127.0.0.1", port=chosen_port, workers=1, reload=False)
    ```
-   인메모리 Job 레지스트리를 쓰므로 워커 2개 이상이면 폴링이 작업을 못 찾는다. 단일 워커는 타협 불가. 이 구성이 Windows 기본 ProactorEventLoop도 보장한다.
+   인메모리 Job 레지스트리를 쓰므로 워커 2개 이상이면 폴링이 작업을 못 찾는다. 단일 워커는 타협 불가. 이 구성은 OS와 무관하게 동일하며, Windows에서는 기본 ProactorEventLoop도 함께 보장한다.
 
 2. **장시간 작업 = `asyncio.create_task` + `run_in_executor`(스레드) + 동기 `subprocess.Popen`.**
    `asyncio.create_subprocess_exec`은 Windows에서 uvicorn이 SelectorEventLoop를 고르면(누군가 --reload를 켜면) NotImplementedError로 조용히 깨진다. 스레드풀 + 동기 Popen은 이벤트 루프 종류와 무관하게 항상 동작한다. **취소는 스레드 취소가 아니라 프로세스 종료로 한다**(아래 6절): 스레드에 얹은 블로킹 작업은 `task.cancel()`로 멈지 않으므로, JobState에 보관한 `Popen` 핸들을 `terminate()`/`kill()` 해서 실제로 멈춘다.
@@ -96,7 +118,7 @@ clipman/
 
 4. **포트 선택.** 9000을 우선 시도하되 점유돼 있으면 빈 포트를 찾아 쓰고, 그 실제 포트로 `webbrowser.open`한다(하드코딩 실패 방지).
 
-5. **로깅.** 서버는 `logs/clipman.log`에 기록한다. `start.cmd`는 실패 시 콘솔 창을 닫지 않고(`pause`) 오류를 보이게 한다.
+5. **로깅.** 서버는 `logs/clipman.log`에 기록한다. 실행기는 실패 시 창을 닫지 않고 오류를 보이게 한다(`start.cmd`는 `pause`, `start.command`는 `read -n 1`). macOS 첫 실행은 Gatekeeper 경고가 뜰 수 있으므로 우클릭 열기 1회를 안내한다.
 
 ---
 
@@ -113,7 +135,7 @@ clipman/
 | POST | `/api/jobs/{id}/export` | 편집(자르기+세로변환) 실행 | `EditOptions` | `202 JobStatus` |
 | DELETE | `/api/jobs/{id}` | 현재 단계 취소 + 정리 | - | `200 JobStatus` / `409` |
 | POST | `/api/jobs/{id}/reveal` | 결과물 폴더를 탐색기로 열기 | - | `204` |
-| POST | `/api/system/update-ytdlp` | `yt-dlp.exe -U` 실행(봇차단 대응) | - | `{updated, version}` |
+| POST | `/api/system/update-ytdlp` | `yt-dlp -U` 실행(봇차단 대응) | - | `{updated, version}` |
 
 리뷰 반영: (1) `GET .../source` 신설: 편집 화면은 다운로드한 원본을 브라우저에서 재생하며 트림 지점과 9:16 크롭 오버레이를 잡아야 하므로 원본을 Range로 서빙하는 엔드포인트가 필수다. (2) `GET .../result`(브라우저 다운로드)는 제거: 결과물은 이미 `output/`에 있고 사용자는 `reveal`로 폴더를 연다. (3) `/api/metadata`가 `qualities[]`(실제 사용 가능 화질 목록, `yt-dlp -J`의 formats에서 도출)를 반환해 UI가 진짜 선택지를 준다. `quality`는 그 목록의 값 또는 `"best"`.
 
@@ -196,15 +218,15 @@ QUEUED --start--> DOWNLOADING --(성공)--> DOWNLOADED --(편집 제출)--> ENCO
 
 ---
 
-## 7. 다운로드 설계 (yt-dlp.exe subprocess)
+## 7. 다운로드 설계 (yt-dlp subprocess)
 
 - **미리보기:** `yt-dlp -J --no-warnings <url>`로 JSON을 받아 title, duration, thumbnail, formats를 파싱한다. formats에서 height별로 정리한 `qualities[]`를 `/api/metadata`가 반환해 UI가 실제 화질 목록을 준다.
 - **다운로드:** `yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" --merge-output-format mp4 --ffmpeg-location <bin> -o "<work>/source.%(ext)s" --newline --progress-template "download:%(progress.downloaded_bytes)s/%(progress.total_bytes)s/%(progress.total_bytes_estimate)s" <url>`. stdout을 줄 단위로 읽어 진행률을 계산한다(total_bytes 부재 시 estimate로 폴백).
 - **취소:** Popen 핸들 terminate.
-- **봇 차단 폴백(로컬 강점):** stdout/stderr에 `Sign in to confirm you're not a bot`가 뜨면 순서대로 재시도: (1) `--cookies-from-browser chrome` (2) `--extractor-args "youtube:player_client=tv"` 또는 `web_safari` (3) 업데이트 안내.
-- **업데이트:** `POST /api/system/update-ytdlp`가 `yt-dlp.exe -U`를 실행한다. 실행파일 자체 갱신이라 파이썬 재시작이 필요 없다(라이브러리 방식 대비 이점).
+- **봇 차단 폴백(로컬 강점, 순서 확정 2026-09-03):** stdout/stderr에 `Sign in to confirm you're not a bot`가 뜨면 순서대로 재시도한다. (1) `--cookies FILE`(사용자가 내보낸 쿠키 파일이 있을 때) (2) `--cookies-from-browser`(macOS는 `chrome` 다음 `safari`, Windows는 `chrome`) (3) `--extractor-args "youtube:player_client=..."` 교체 (4) yt-dlp 업데이트 안내.
+- **업데이트:** `POST /api/system/update-ytdlp`가 `yt-dlp -U`를 실행한다. 실행파일 자체 갱신이라 파이썬 재시작이 필요 없다(라이브러리 방식 대비 이점).
 
-쿠키 주의(리뷰 반영): clipman이 기동 시 기본 브라우저(대개 Chrome)를 자동으로 여는데, `--cookies-from-browser chrome`는 Chrome 실행 중 쿠키 DB 잠금과 App-Bound Encryption으로 실패할 수 있다. 그래서 쿠키 폴백은 (a) 사용자가 내보낸 쿠키 파일(`--cookies FILE`)을 1순위로 두거나, (b) UI에서 "브라우저를 닫고 다시 시도" 안내를 제공하는 이중화를 둔다. 쿠키는 민감정보이므로 로컬에만 두고 로그/전송에 넣지 않는다.
+쿠키 주의(리뷰 반영): clipman이 기동 시 기본 브라우저를 자동으로 여는데, `--cookies-from-browser`는 브라우저 실행 중 쿠키 DB 잠금 때문에 실패할 수 있다(Windows는 Chrome App-Bound Encryption, macOS는 Keychain 접근 권한 프롬프트가 추가 변수다). 그래서 쿠키 파일(`--cookies FILE`)을 1순위로 두고, 브라우저 추출은 2순위로 내리며, 실패 시 UI에서 "브라우저를 닫고 다시 시도" 안내를 제공한다. macOS Keychain 프롬프트 실제 동작은 M1 실측 대상이다. 쿠키는 민감정보이므로 로컬에만 두고 로그와 전송에 넣지 않는다.
 
 ---
 
@@ -243,21 +265,29 @@ ffmpeg -ss S -i src -t D -filter_complex \
 
 ## 9. 번들 실행파일 경로
 
-`bin/`에 `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`를 동봉한다(gyan.dev/BtbN 정적 빌드 + yt-dlp 릴리스). 최초 실행 다운로드가 없어 오프라인에도 견고하다.
+`bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 동봉한다(Windows는 `.exe` 접미). 최초 실행 다운로드가 없어 오프라인에도 견고하다.
+
+경로 책임은 두 모듈로 나눈다. `app/paths.py`가 앱 루트 기준 디렉터리 상수(`pathlib.Path`)를 소유하고, `wrappers/binaries.py`는 실행파일 이름 해석(플랫폼 분기)과 존재 확인만 한다.
 
 ```python
+# app/paths.py
+from pathlib import Path
+APP_ROOT = Path(__file__).resolve().parents[2]   # app/ -> backend/ -> clipman/
+BIN_DIR, WORK_DIR = APP_ROOT / "bin", APP_ROOT / "work"
+OUTPUT_DIR, LOGS_DIR = APP_ROOT / "output", APP_ROOT / "logs"
+
 # wrappers/binaries.py
-# v1(.cmd + venv): 앱 루트 기준 bin/
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/ -> backend/ -> clipman/
-BIN = os.path.join(BASE, "bin")
-# v2(PyInstaller onefile): 자원은 sys._MEIPASS에 풀리므로 그때는 아래로 교체
-# if getattr(sys, "frozen", False): BIN = os.path.join(sys._MEIPASS, "bin")
-FFMPEG  = os.path.join(BIN, "ffmpeg.exe")
-FFPROBE = os.path.join(BIN, "ffprobe.exe")
-YTDLP   = os.path.join(BIN, "yt-dlp.exe")
+import sys
+EXE_SUFFIX = ".exe" if sys.platform == "win32" else ""   # darwin/linux는 확장자 없음
+def binary_path(name: str) -> Path:                       # name: "ffmpeg" | "ffprobe" | "yt-dlp"
+    return BIN_DIR / f"{name}{EXE_SUFFIX}"
+# v2(PyInstaller onefile): 자원이 sys._MEIPASS에 풀리므로 그때 BIN_DIR만 교체한다
+# if getattr(sys, "frozen", False): BIN_DIR = Path(sys._MEIPASS) / "bin"
 ```
 
-리뷰 반영: v1은 frozen이 아니므로 venv 경로만 둔다. PyInstaller onefile(v2)에서는 `--add-binary`로 넣은 자원이 `sys.executable` 옆이 아니라 `sys._MEIPASS`에 풀리므로, 그 시점에 위 주석 분기를 활성화한다. 라이선스: gyan.dev는 GPL 빌드로 개인 로컬 사용에는 무관하고 제3자 배포 시에만 의무가 생긴다(필요 시 BtbN LGPL 빌드).
+정정 반영(2026-09-03): `.exe` 하드코딩을 제거하고 `sys.platform` 분기 한 곳으로 모았다. 플랫폼 판정이 이 모듈에만 있으므로 macOS와 Windows 사이를 오가도 다른 코드가 바뀌지 않는다.
+
+리뷰 반영: v1은 frozen이 아니므로 venv 경로만 둔다. PyInstaller onefile(v2)에서는 `--add-binary`로 넣은 자원이 `sys.executable` 옆이 아니라 `sys._MEIPASS`에 풀리므로, 그 시점에 위 주석 분기를 활성화한다. 라이선스: 정적 ffmpeg 빌드가 GPL이면 개인 로컬 사용에는 무관하고 제3자 배포 시에만 의무가 생긴다(배포 계획이 서면 LGPL 빌드로 교체 검토).
 
 ---
 
@@ -305,6 +335,7 @@ YTDLP   = os.path.join(BIN, "yt-dlp.exe")
 | 실제 인코딩 통합 | `ffmpeg -f lavfi -i testsrc=... -f lavfi -i sine=...`로 **오디오 포함** 합성 영상 생성(리뷰 반영: 무음 결함을 잡으려면 픽스처에 오디오 필수), 출력 해상도/길이/**오디오 스트림 존재**를 검증 |
 | 봇차단/네트워크 실패 | subprocess 모킹으로 비정상 returncode+stderr 위조, 사용자 친화 오류 검증 |
 | 실제 YouTube 접속 | `@pytest.mark.network`로 격리, 상시 스위트 제외 |
+| 실물 바이너리 필요 | `tests/integration/`에 두고 `@pytest.mark.integration`으로 격리. **기본 스위트는 `bin/`이 비어 있어도 전부 통과해야 한다**(정정 2026-09-03) |
 
 리뷰 반영: 세로 변환 통합 테스트 픽스처는 반드시 오디오를 포함한다(`sine` 입력 추가). 오디오 없는 testsrc만 쓰면 blur_pad류 오디오 누락을 원리적으로 못 잡는다. 세 모드 모두 결과물의 오디오 스트림 존재를 ffprobe로 단언한다.
 
@@ -315,11 +346,11 @@ YTDLP   = os.path.join(BIN, "yt-dlp.exe")
 리뷰 반영: 사용자는 비개발자다. "개발 PC라 마찰 0" 전제는 성립하지 않는다. 따라서 첫 설치는 사용자가 아니라 **Claude가 대신 수행**한다(전 계정 실행 위임 원칙: 사용자가 하는 일이 말 한마디면 Claude가 처리한다). 절차:
 
 1. Claude가 이 PC에 Python 확인/설치를 돕고, `backend/`에 venv 생성 후 `pip install -r requirements.txt`.
-2. Claude가 `bin/`에 `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`를 내려받아 배치.
+2. Claude가 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 내려받아 배치하고(Windows는 `.exe`), 출처와 버전, SHA256을 `docs/binaries-manifest.md`에 기록한다. macOS는 `uname -m`으로 arm64/x86_64를 판별해 맞는 빌드를 받고, 정적 빌드 확보가 어려우면 Homebrew 설치본을 복사한다. 내려받은 파일에는 `chmod +x`가 필요하고, macOS는 첫 실행 시 격리 속성 때문에 차단될 수 있으므로 `xattr -d com.apple.quarantine` 처리를 함께 확인한다.
 3. Claude가 `frontend/`에서 `npm install && npm run build`로 `dist/`를 1회 생성.
-4. 이후 사용자는 `start.cmd` 더블클릭만 하면 된다: venv 활성화 -> `python -m app.main`(내부에서 빈 포트 선택 + uvicorn 단일 워커 실행 + 브라우저 자동 열기). 실패 시 콘솔을 닫지 않고 오류와 `logs/clipman.log` 위치를 보여준다.
+4. 이후 사용자는 실행기를 더블클릭만 하면 된다(macOS `start.command`, Windows `start.cmd`): venv 활성화 -> `python -m app.main`(내부에서 빈 포트 선택 + uvicorn 단일 워커 실행 + 브라우저 자동 열기). 실패 시 창을 닫지 않고 오류와 `logs/clipman.log` 위치를 보여준다. macOS 첫 실행은 Gatekeeper 경고가 뜰 수 있어 우클릭 열기 1회를 안내한다.
 
-- **v2(남에게 배포):** PyInstaller onefile. `dist/`를 `--add-data`, `bin/`을 `--add-binary`로 동봉하고 `sys._MEIPASS` 기준 경로. `uvicorn.run(app, ...)`에 문자열 아닌 app 객체 전달. 미서명 exe 백신 오탐과 기동 지연을 감안.
+- **v2(남에게 배포):** PyInstaller onefile. `dist/`를 `--add-data`, `bin/`을 `--add-binary`로 동봉하고 `sys._MEIPASS` 기준 경로. `uvicorn.run(app, ...)`에 문자열 아닌 app 객체 전달. Windows는 미서명 exe 백신 오탐과 기동 지연을, macOS는 `.app` 번들 + 코드서명/공증(notarization)을 감안. v1 범위 밖이다.
 
 ---
 
@@ -337,16 +368,16 @@ YTDLP   = os.path.join(BIN, "yt-dlp.exe")
 
 ## 15. 확정 결정과 재심 대상 전제
 
-확정: (1) yt-dlp/ffmpeg 모두 번들 실행파일 + subprocess + Popen 취소, (2) 단일 워커 + 폴링, (3) gyan.dev 정적 번들, (4) 다운로드/export 분리 + 원본 보존으로 "한 번 받아 여러 번 편집", (5) filter_complex 오디오 명시 매핑, (6) v1 세로 모드는 CROP/PAD, blur_pad는 v1.1, (7) 동작-분기 우선 성장식 에러, (8) 첫 설치는 Claude가 대행, 이후 더블클릭.
+확정: (1) yt-dlp/ffmpeg 모두 번들 실행파일 + subprocess + Popen 취소, (2) 단일 워커 + 폴링, (3) gyan.dev 정적 번들, (4) 다운로드/export 분리 + 원본 보존으로 "한 번 받아 여러 번 편집", (5) filter_complex 오디오 명시 매핑, (6) v1 세로 모드는 CROP/PAD, blur_pad는 v1.1, (7) 동작-분기 우선 성장식 에러, (8) 첫 설치는 Claude가 대행, 이후 더블클릭, (9) **대상 플랫폼은 macOS 1순위 + Windows 병행이며 플랫폼 분기는 `binaries.py`와 실행기 파일에만 존재한다(2026-09-03 확정)**.
 
-재심 대상 전제(구현 착수 시 실측):
-- 번들 ffmpeg 실제 버전에서 세 필터와 컷 정확도, 세 모드의 오디오 유지를 통합 테스트로 1회 검증.
-- Windows 최신 Chrome App-Bound Encryption으로 `--cookies-from-browser`가 막힐 수 있음. 자동 브라우저 열기와의 충돌 때문에 `--cookies` 파일 폴백을 1순위로 검토.
-- yt-dlp `player_client` 유효 조합은 자주 바뀜. 설정으로 빼 폴백으로만 사용.
-- 포트 자동 선택 시 브라우저에 전달할 실제 포트 배선을 확인.
+재심 대상 전제(실측 대상. 전부 구현 계획서의 명시적 검증 태스크로 편입됨):
+- 번들 ffmpeg 실제 버전에서 세 필터와 컷 정확도, 세 모드의 오디오 유지를 통합 테스트로 1회 검증 → 계획서 M1-6.
+- `--cookies-from-browser`가 막힐 수 있음(Windows는 Chrome App-Bound Encryption, macOS는 Keychain 권한 프롬프트). 자동 브라우저 열기와의 충돌 때문에 `--cookies` 파일 폴백을 1순위로 확정했고, 실동작은 실측 대상 → 계획서 M3-3.
+- yt-dlp `player_client` 유효 조합은 자주 바뀜. `wrappers/ytdlp.py` 모듈 상수 한 곳에 두고 폴백으로만 사용 → 계획서 M1-5.
+- 포트 자동 선택 시 브라우저에 전달할 실제 포트 배선을 확인 → 계획서 M4-3.
 
 ---
 
-## 다음 단계 (이 문서 범위 밖)
+## 다음 단계 (2026-09-03 갱신)
 
-이 문서로 개발 아키텍처를 확정한다. 사용자 사인오프 후 다음 단계는 구현 계획 수립(writing-plans: 파일별 작업 순서, TDD 단위)이며 별도 착수 대상이다.
+사인오프 완료. 구현 계획(`docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md`)이 이 문서를 입력으로 작성됐으며, 구현은 그 계획서 순서를 따른다. 이 문서는 API 계약과 폴더 구조의 정본으로서 구현 중 변경이 필요하면 계획서가 아니라 이 문서를 먼저 고친다.
