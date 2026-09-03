@@ -29,6 +29,27 @@ M0(착수 관문) 완료. 관문 4개가 모두 닫혔다.
 
 구현 순서는 계획서가 정본이며, 원 권장안(첫 수직 슬라이스: `wrappers/` 순수 어댑터 TDD -> `jobs/manager.py` -> `services/` -> FastAPI 라우터 -> Svelte UI)을 그대로 승계했다.
 
+M1 wrappers 계층도 완료했다(단위 테스트 107개 통과, 번들 바이너리 없이).
+
+| 마일스톤 | 상태 | 비고 |
+|---|---|---|
+| M1-1 스캐폴딩 (`requirements.txt`, `pyproject.toml`, `paths.py`) | **완료** | 의존성 버전 고정 |
+| M1-2 `wrappers/binaries.py` | **완료** | 실행파일 이름의 플랫폼 분기 단일 지점 |
+| M1-3 `wrappers/ffprobe.py` | **완료** | 회전 메타 처리, 오디오 유무 판정 |
+| M1-4 `wrappers/ffmpeg.py` | **완료** | CROP/PAD 조립, 자동 PAD 전환, 진행률 파싱 |
+| M1-5 `wrappers/ytdlp.py` | **완료** | 메타 조회, 다운로드 인자, 폴백 순서, 에러 4종 분류 |
+| M1-0 바이너리 조달 | **미완료** | 실사용 기기에서만 가능 |
+| M1-6 통합 검증 | **미완료** | 테스트는 작성됨(`tests/integration/`), 실행은 바이너리 조달 후 |
+| M2 이후 | 미착수 | `jobs/manager.py`부터 |
+
+**중요: 이 작업은 아직 main에 없다.** 브랜치 `claude/clipman-product-progress-wlaf5v`에 있고 드래프트 PR로 열려 있다(`blazethrottle/clipman#1`). 이어받는 세션은 그 브랜치에서 시작하거나 PR을 먼저 병합해야 한다.
+
+### 이어받는 즉시 할 일
+
+1. `bin/`에 실행파일 3종 조달 (M1-0). 절차는 `docs/binaries-manifest.md`.
+2. `./.venv/bin/pytest -m integration` 실행 (M1-6). 세 모드의 오디오 유지가 여기서 처음 실측된다.
+3. 통과하면 M2 `jobs/manager.py` 착수.
+
 ## 4. 재심 대상 전제 (판정 완료, 2026-09-03)
 
 아키텍처 문서 결론은 제약이 아니라 재심 가능한 상태로 물려받았고, 2026-09-03에 7건 전부를 단일 답으로 확정했다. **대상 플랫폼 확정: macOS 1순위 + Windows 병행(크로스플랫폼 유지).** 근거는 원 PC(Windows)와의 왕복 가능성이고, 비용은 `binaries.py`의 `sys.platform` 분기와 실행기 파일 2개뿐이다.
@@ -68,7 +89,18 @@ M0(착수 관문) 완료. 관문 4개가 모두 닫혔다.
 
 M0가 끝났으므로 시작 절차가 바뀌었다.
 
-1. `git clone git@github.com:blazethrottle/clipman.git` 후 폴더 진입.
+```bash
+git clone git@github.com:blazethrottle/clipman.git
+cd clipman
+git checkout claude/clipman-product-progress-wlaf5v   # 작업은 main이 아니라 이 브랜치에 있다
+
+cd backend
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+./.venv/bin/pytest                                    # 107 passed 확인 (바이너리 불필요)
+```
+
+1. 위 명령으로 브랜치를 받고 단위 테스트 통과를 확인한다. 여기서 실패하면 환경 문제이므로 먼저 해결한다.
 2. 이 문서 -> 구현 계획서 -> architecture 순으로 읽는다(R1 선행자료 게이트). design spec은 제품 의도 확인용으로 필요할 때 읽는다.
 3. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
-4. 계획서의 마일스톤 순서대로 착수한다. 바이너리 없이도 통과하는 단위 테스트(인자 조립, 경로 해석, 파싱)는 이미 작성돼 있으므로, macOS에서는 실물 바이너리가 필요한 통합 테스트(`@pytest.mark.integration`)부터 확인한다.
+4. `./.venv/bin/pytest -m integration`으로 M1-6을 실측한다. 세 모드의 오디오 유지 검증이 여기서 처음 실행된다. 통과 후 M2로 넘어간다.
