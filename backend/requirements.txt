@@ -1,0 +1,10 @@
+# clipman backend 의존성 (2026-09-03 고정)
+# 런타임
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+
+# 개발/테스트 (v1은 개인 로컬 도구라 파일을 나누지 않는다)
+pytest==9.1.1
+pytest-subprocess==1.6.0
+httpx==0.28.1

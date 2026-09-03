@@ -49,7 +49,7 @@
 
 - 테스트 먼저: (1) `win32`에서 `.exe` 접미가 붙는다, (2) `darwin`/`linux`에서는 붙지 않는다, (3) 경로가 `BIN_DIR` 하위다, (4) 파일이 없으면 명확한 예외(`BinaryNotFound`)를 던지고 메시지에 조달 안내가 있다.
 - 플랫폼 분기는 `monkeypatch`로 `sys.platform`을 위조해 검증한다. 실제 OS와 무관하게 3개 플랫폼 경로가 전부 테스트된다.
-- DoD: 이 저장소에서 유일하게 플랫폼을 판정하는 지점이 이 모듈 하나임을 `grep`으로 확인.
+- DoD: **실행파일 이름**의 플랫폼 분기가 이 모듈에만 존재함을 `grep sys.platform`으로 확인. 예외는 M3-4의 `services/files.py`(폴더 열기 명령 분기) 하나뿐이며, 그 외 코드는 `sys.platform`을 보지 않는다.
 
 ### M1-3 `wrappers/ffprobe.py`
 
