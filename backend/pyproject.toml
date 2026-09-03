@@ -1,0 +1,9 @@
+# pytest 설정 전용. 패키징 도구로 쓰지 않는다.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-m 'not integration and not network'"
+markers = [
+    "integration: 실물 번들 실행파일(bin/)이 필요한 테스트. 기본 스위트에서 제외",
+    "network: 실제 네트워크 접속이 필요한 테스트. 기본 스위트에서 제외",
+]
