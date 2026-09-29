@@ -61,5 +61,6 @@ YouTube 영상을 받아 세로 9:16 쇼츠로 편집하는 개인용 로컬 도
 
 1. `git clone git@github.com:blazethrottle/clipman.git` 후 폴더 진입.
 2. 이 문서 -> design spec -> architecture 순으로 읽는다(R1 선행자료 게이트).
-3. 4절 재심 전제(특히 바이너리/실행기/경로)를 먼저 판정한다.
-4. writing-plans로 구현 계획을 만든 뒤 사용자와 합의하고 착수한다.
+3. 개인 LLM Wiki(비공개)의 입구 페이지 `wiki/projects/clipman.md`를 읽는다(Mac: `python3 ~/llm-wiki-automation/ontology/wiki_query.py clipman`). 적용할 방법론 후보, 같은 부류 제품(slidecaptain)의 노하우, 이 Mac에서 확인된 셸·ffmpeg 함정이 정리되어 있다.
+4. 4절 재심 전제(특히 바이너리/실행기/경로)를 먼저 판정한다.
+5. writing-plans로 구현 계획을 만든 뒤 사용자와 합의하고 착수한다.
