@@ -1,6 +1,6 @@
 # clipman 핸드오프 (Windows 기획 세션 -> macOS 개발 세션)
 
-- 작성일: 2026-09-01 (KST) / 갱신: 2026-09-03 (M0 착수 관문 판정 반영)
+- 작성일: 2026-09-01 (KST) / 갱신: 2026-09-03 (M0 착수 관문 판정 반영), 2026-10-10 (M0·M1 산출물 main 병합 반영)
 - 배경: 기획과 개발 아키텍처 확정까지를 Windows PC에서 완료했고, 이후 개발은 macOS(맥북)에서 이어간다.
 - 진본 위치: GitHub `blazethrottle/clipman` (SSH). macOS에서 `git clone` 후 아래 순서로 읽고 시작한다.
 
@@ -42,7 +42,7 @@ M1 wrappers 계층도 완료했다(단위 테스트 107개 통과, 번들 바이
 | M1-6 통합 검증 | **미완료** | 테스트는 작성됨(`tests/integration/`), 실행은 바이너리 조달 후 |
 | M2 이후 | 미착수 | `jobs/manager.py`부터 |
 
-**중요: 이 작업은 아직 main에 없다.** 브랜치 `claude/clipman-product-progress-wlaf5v`에 있고 드래프트 PR로 열려 있다(`blazethrottle/clipman#1`). 이어받는 세션은 그 브랜치에서 시작하거나 PR을 먼저 병합해야 한다.
+**이 작업은 2026-10-10에 main으로 병합되었다**(`blazethrottle/clipman#1`). 이어받는 세션은 main에서 시작하면 된다.
 
 ### 이어받는 즉시 할 일
 
@@ -85,14 +85,14 @@ M1 wrappers 계층도 완료했다(단위 테스트 107개 통과, 번들 바이
 - v1은 최소(다운로드 + 자르기 + 세로 변환). blur_pad(흐린 배경)는 v1.1, 자막은 v2, 하이라이트는 v3.
 - 비개발자 사용자다. 설치와 실행은 Claude가 대행하고 사용자는 더블클릭만 한다.
 
-## 7. macOS 세션 시작 방법 (2026-09-03 갱신)
+## 7. macOS 세션 시작 방법 (2026-10-10 갱신)
 
-M0가 끝났으므로 시작 절차가 바뀌었다.
+M0와 M1 코드가 main에 있으므로 main에서 바로 시작한다.
 
 ```bash
 git clone git@github.com:blazethrottle/clipman.git
 cd clipman
-git checkout claude/clipman-product-progress-wlaf5v   # 작업은 main이 아니라 이 브랜치에 있다
+git pull origin main                                  # 이미 클론이 있다면 최신화만
 
 cd backend
 python3 -m venv .venv
@@ -100,7 +100,7 @@ python3 -m venv .venv
 ./.venv/bin/pytest                                    # 107 passed 확인 (바이너리 불필요)
 ```
 
-1. 위 명령으로 브랜치를 받고 단위 테스트 통과를 확인한다. 여기서 실패하면 환경 문제이므로 먼저 해결한다.
+1. 위 명령으로 저장소를 받고 단위 테스트 통과를 확인한다. 여기서 실패하면 환경 문제이므로 먼저 해결한다.
 2. 이 문서 -> 구현 계획서 -> architecture 순으로 읽는다(R1 선행자료 게이트). design spec은 제품 의도 확인용으로 필요할 때 읽는다.
 3. 개인 LLM Wiki(비공개)의 입구 페이지 `wiki/projects/clipman.md`를 읽는다(Mac: `python3 ~/llm-wiki-automation/ontology/wiki_query.py clipman`). 적용할 방법론 후보, 같은 부류 제품(slidecaptain)의 노하우, 이 Mac에서 확인된 셸·ffmpeg 함정이 정리되어 있다.
 4. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
