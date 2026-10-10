@@ -102,5 +102,6 @@ python3 -m venv .venv
 
 1. 위 명령으로 브랜치를 받고 단위 테스트 통과를 확인한다. 여기서 실패하면 환경 문제이므로 먼저 해결한다.
 2. 이 문서 -> 구현 계획서 -> architecture 순으로 읽는다(R1 선행자료 게이트). design spec은 제품 의도 확인용으로 필요할 때 읽는다.
-3. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
-4. `./.venv/bin/pytest -m integration`으로 M1-6을 실측한다. 세 모드의 오디오 유지 검증이 여기서 처음 실행된다. 통과 후 M2로 넘어간다.
+3. 개인 LLM Wiki(비공개)의 입구 페이지 `wiki/projects/clipman.md`를 읽는다(Mac: `python3 ~/llm-wiki-automation/ontology/wiki_query.py clipman`). 적용할 방법론 후보, 같은 부류 제품(slidecaptain)의 노하우, 이 Mac에서 확인된 셸·ffmpeg 함정이 정리되어 있다.
+4. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
+5. `./.venv/bin/pytest -m integration`으로 M1-6을 실측한다. 세 모드의 오디오 유지 검증이 여기서 처음 실행된다. 통과 후 M2로 넘어간다.
