@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "clipman",
+  "version": "0.2.0",
+  "description": "YouTube에서 구간을 골라 세로 쇼츠로 편집합니다.",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoOh2edUvKf4IEwR4tvCGRQqPW86raEjL3L3b4Zqw7DMgNVKtVCdwjcTRzBkszEiUd8USUWQ9JzNa58UKIkrggg2AYdo4qyZEHauuFGfMfuwmhsdH8W6WJJQQPEmScELhFIIToNiXD4Rbq77zQjGHmoCfcmN/4Xo2qSzZ4hzn8IOrbNHhKnBNh1mqAmZiujeMhr7dMHA02obtX8AgqNLt8H7qdqvpZ+CwQE1HF4jexdtksMtUPmDNxkf99bZkoFB3K2Uc2+kJvKUHmrgvgMDYgYznqT1wzDIVyfgWq4TMvZ4WnhPrswUqnibtNVu+xc/GdTMmR9sXtfu8lZZJ1nAlWwIDAQAB",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "클립맨 열기"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' http://127.0.0.1:*; media-src http://127.0.0.1:* blob:;"
+  }
+}

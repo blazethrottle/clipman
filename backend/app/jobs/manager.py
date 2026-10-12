@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from app import paths
 from app.capture import Selection, SourceTimeline
+from app.processes import OwnedProcess
 from app.wrappers.ffmpeg import EditOptions
 from app.wrappers.ffprobe import SourceMeta
 
@@ -73,6 +74,10 @@ class JobManager:
             # Popen에는 복사할 수 없는 핸들과 잠금이 있다. 상태 사본에는 넣지 않는다.
             return deepcopy(replace(self._jobs[job_id], _proc=None))
 
+    def list_jobs(self) -> list[JobState]:
+        with self._lock:
+            return [self.get(job_id) for job_id in self._jobs]
+
     def _start(self, job: JobState, status: JobStatus) -> int:
         job.status = status
         job.generation += 1
@@ -115,6 +120,9 @@ class JobManager:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=2)
+        # 부모가 먼저 끝나도 TERM을 무시하는 POSIX 자식 그룹을 남기지 않는다.
+        if isinstance(proc, OwnedProcess):
+            proc.kill()
 
     def attach_process(self, job_id: str, generation: int, proc: subprocess.Popen) -> bool:
         with self._lock:
@@ -125,6 +133,41 @@ class JobManager:
         # 취소와 실행 사이의 경합으로 늦게 생성된 프로세스도 반드시 종료한다.
         self._stop(proc)
         return False
+
+    def start_process(self, job_id: str, generation: int, args: list[str]) -> subprocess.Popen | None:
+        with self._lock:
+            job = self._jobs[job_id]
+            if not self._current(job, generation):
+                return None
+            if job._proc is not None:
+                raise InvalidTransition("이미 실행 중인 프로세스가 있습니다.")
+            job._proc = OwnedProcess(args)
+            return job._proc
+
+    def release_process(self, job_id: str, generation: int, proc: subprocess.Popen) -> bool:
+        with self._lock:
+            job = self._jobs[job_id]
+            if not self._current(job, generation) or job._proc is not proc:
+                return False
+            if proc.poll() is None:
+                raise InvalidTransition("프로세스가 아직 종료되지 않았습니다.")
+            job._proc = None
+            return True
+
+    def publish(self, job_id: str, generation: int, temporary: Path, output: Path) -> bool:
+        with self._lock:
+            job = self._jobs[job_id]
+            if not self._current(job, generation, JobStatus.ENCODING):
+                return False
+            if temporary.resolve().parent != job.work_dir / "tmp":
+                raise ValueError("잘못된 임시 출력 경로입니다.")
+            if output.resolve().is_relative_to(self.work_root) or output.exists():
+                raise ValueError("완성 출력 경로가 안전하지 않습니다.")
+            self._nonempty_file(temporary)
+            if job._proc is not None:
+                raise InvalidTransition("프로세스 종료 확인이 필요합니다.")
+            temporary.replace(output)
+            return self.completed(job_id, generation, output)
 
     def progress(self, job_id: str, generation: int, value: float) -> bool:
         if not math.isfinite(value):
@@ -189,6 +232,8 @@ class JobManager:
                 return False
             self._finish(job, JobStatus.ERROR, message)
             job.error_code = code
+            if job.source_path is None and job.work_dir.exists():
+                shutil.rmtree(job.work_dir)
             return True
 
     def cancel(self, job_id: str) -> JobState:

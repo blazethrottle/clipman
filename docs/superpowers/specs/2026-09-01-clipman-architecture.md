@@ -31,16 +31,19 @@
 
 ### 2026-10-12 Chrome 흐름 개정 계약
 
-이 절은 아래의 이전 SPA 진입 및 전체 다운로드 요청 계약보다 우선함. 초기 연결은 `Chrome MV3 확장 -> 127.0.0.1 FastAPI -> 번들 실행파일`임. content script는 현재 영상 ID/URL과 시작/끝을 읽고, 서비스 워커가 로컬 요청을 중계하며 사이드 패널은 선택과 상태, Svelte/Vite 편집 탭은 정밀 구도 조절을 담당함. API와 확장은 아직 미구현임.
+이 절은 아래의 이전 SPA 진입 및 전체 다운로드 요청 계약보다 우선함. 초기 연결은 `Chrome MV3 확장 -> 127.0.0.1 FastAPI -> 번들 실행파일`임. content script는 현재 영상 ID/URL과 시각을 읽고, 서비스 워커가 로컬 요청을 중계하며 패널은 선택과 상태, Svelte/Vite 편집 탭은 정밀 구도 조절을 담당함. 초기 API/확장 개발 연결은 구현됐으며 실제 사용자 Chrome의 인수는 남음.
 
-- 연결: loopback 전용, 단일 워커. 최초 연결에 실제 포트와 무작위 세션 토큰을 사용함. 서버는 Host, 허용된 확장 Origin과 토큰을 검사해야 함. 임의 웹 Origin, DNS rebinding과 토큰 없는 변경 요청을 거부함. Native Messaging은 첫 구현에 채택하지 않음.
+- 연결: loopback 전용, 단일 워커. 최초 연결에 실제 포트와 무작위 기기 연결 키를 사용함. 키는 gitignore logs/connection.key에 보존하고 URL/실행 로그/패키지에 넣지 않음. 서버는 Host, 허용된 확장 Origin 및 토큰/확장 ID 헤더를 검사함. 임의 웹 Origin, DNS rebinding과 토큰 없는 변경 요청을 거부함. 확장 storage.local은 TRUSTED_CONTEXTS 초기화 후 저장/조회하며 content script 접근을 거부함. Native Messaging은 첫 구현에 채택하지 않음.
 - `POST /api/jobs`: `{video_id, url, start_sec, end_sec, quality}`를 받는 선택 구간 확보 요청으로 개정함. 시작/끝은 YouTube 원본 시각이며 `0 <= start < end`, 모든 시각은 유한값이어야 함. URL의 영상 ID와 별도 ID가 다르면 거부함. URL을 검증하고 단일 watch URL로 정규화함.
 - `Selection`은 영상 식별 및 원본 선택을 보존함. `SourceTimeline(origin_start_sec, duration_sec)`은 확보 파일의 로컬 0초가 원본 몇 초인지와 실제 ffprobe 길이를 저장함. 예: 원본 120~135초, 파일 origin=120이면 로컬 2~5초 편집은 원본 122~125초임. 요청 시작을 실측값으로 오인하지 않음. 획득 서비스는 정밀 컷과 실제 장면 검증 후 origin을 등록함.
 - export의 `EditOptions.trim_start/trim_end`는 항상 확보 파일의 로컬 초임. `SourceTimeline.original_range`에서 음수, 역전, NaN, 무한대와 파일 길이 초과를 거부함. 원본 URL과 선택 범위 및 매핑은 작업 자료에 유지함.
 - 구간 명령은 기존 다운로드 인자에 `--no-playlist --download-sections '*START-END' --force-keyframes-at-cuts`를 추가함. 정밀 컷의 처리 비용과 전송량은 별도로 실측함. 전체 다운로드는 기존 어댑터 호출로만 남으며 API 기본 흐름에 넣지 않음.
 - M2 `JobManager`는 잠금으로 레지스트리를 보호하며 호출자에게 분리된 상태 사본을 반환함. 다운로드 및 인코딩 시작마다 `generation`을 증가시킴. 진행률/완료/오류/프로세스 등록은 해당 generation에만 적용함. 취소 뒤 늦은 콜백이 완료로 바꾸거나 과거 인코딩 콜백이 새 출력에 영향을 주면 안 됨.
 - 취소는 QUEUED/DOWNLOADING/ENCODING에서만 허용함. 다운로드 취소는 해당 job 폴더, 인코딩 취소는 해당 job의 tmp만 삭제함. 종료를 확인한 뒤 정리함. ERROR/CANCELED에 보존 원본이 있으면 재편집 가능함. 완성 출력은 삭제하지 않음. ERROR에 남은 다운로드 잔여 파일의 정리는 M3 서비스가 맡음.
-- Popen 소유권은 작업 관리자에 등록한 프로세스에 한함. M2는 해당 프로세스의 terminate/wait/kill을 담당함. yt-dlp가 만든 ffmpeg 등 자식 프로세스의 트리 종료는 M3의 실행 계층에서 플랫폼별 구현 및 실측이 필요함. 이를 완료하지 않으면 다운로드 취소의 종단 관문을 통과한 것으로 보지 않음.
+- Popen 소유권은 작업 관리자가 잠금 안에서 생성하고 등록한 프로세스에 한함. processes.py가 Windows taskkill /T /F와 POSIX 전용 세션 그룹 종료를 담당함. 부모가 먼저 끝나도 POSIX 잔여 그룹에 KILL을 보냄. Windows 트리 종료는 실제 부모/자식으로 검사했고 POSIX 분기는 대역 검사만 완료함. 출력 검증 후 게시와 완료 등록은 같은 잠금 안에서 진행함.
+- 구현된 API는 GET /api/connect, POST /api/jobs, GET/DELETE /api/jobs/{id}, POST /api/jobs/{id}/export, GET/HEAD source 및 outputs/{index}임. 아래 이전 metadata, reveal 및 system/update-ytdlp는 아직 구현하지 않음. source/outputs는 정확한 경로별 HMAC 읽기 ticket으로 비디오 재생/Range/다운로드를 지원함. ticket은 변경 요청의 인증으로 쓰지 않음. 응답은 실제 로컬 파일 경로와 Popen을 노출하지 않음.
+- 소스 시각의 origin_basis는 requested_precise_cut임. 영상 길이는 ffprobe로 확인하되 요청 시작을 실제 장면 시작의 실측값으로 승격하지 않음. 일반 영상의 장면 시각과 품질은 후속 검증함.
+- 폴더: extension/에 MV3 manifest와 content/background/shared, frontend/src/에 Svelte 패널/편집, frontend 빌드 결과는 extension/dist/임. 전체 런타임 JS는 확장 패키지에 포함함. 빌드 및 개인 ZIP은 gitignore하며 재현 명령은 README에 있음.
 - 상세 순서와 이번 착수 범위는 [새 구현 계획](../plans/2026-10-12-clipman-capture-implementation-plan.md)을 따름.
 
 전부 사용자 PC 안에서 동작하는 로컬 3계층이다(macOS 1순위, Windows 병행). 브라우저는 화면만, 로컬 파이썬 서버가 번들 실행파일을 호출해 무거운 처리를 한다.
