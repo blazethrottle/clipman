@@ -79,7 +79,7 @@ class TestBuildDownloadArgs:
     def test_quality_becomes_height_capped_selector(self, tmp_path):
         args = ytdlp.build_download_args("URL", "1080p", tmp_path)
         selector = args[args.index("-f") + 1]
-        assert selector == "bestvideo[height<=1080]+bestaudio/best"
+        assert selector == "bestvideo[height<=1080]+bestaudio/best[height<=1080]"
 
     def test_best_quality_has_no_height_cap(self, tmp_path):
         selector = ytdlp.build_download_args("URL", "best", tmp_path)[

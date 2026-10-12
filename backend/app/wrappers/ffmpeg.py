@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from math import gcd
+from math import gcd, isfinite
 from pathlib import Path
 
 from .ffprobe import SourceMeta
@@ -84,11 +84,13 @@ def clamp_crop_x(
 
 
 def clip_duration(meta: SourceMeta, opts: EditOptions) -> float:
-    start = opts.trim_start or 0.0
+    start = 0.0 if opts.trim_start is None else opts.trim_start
     end = meta.duration if opts.trim_end is None else opts.trim_end
-    if end <= start:
-        raise ValueError(f"끝 지점({end})이 시작 지점({start})보다 뒤여야 합니다.")
-    return round(end - start, 6)
+    if not all(isfinite(value) for value in (meta.duration, start, end)):
+        raise ValueError("영상 길이와 편집 시각은 유한한 숫자여야 합니다.")
+    if not 0 <= start < end <= meta.duration:
+        raise ValueError(f"편집 구간({start}~{end})은 영상 길이({meta.duration}) 안에 있어야 합니다.")
+    return end - start
 
 
 def _filtergraph(mode: EncodeMode, meta: SourceMeta, opts: EditOptions) -> str:
@@ -114,6 +116,7 @@ def build_encode_args(
     exe: Path | str = "ffmpeg",
 ) -> list[str]:
     """구간 컷 + 세로 변환 명령. -ss를 -i 앞에 두어 빠른 시크와 프레임 정확성을 함께 얻는다."""
+    duration = clip_duration(meta, opts)
     mode = resolve_mode(meta, opts.mode, opts.target_w, opts.target_h)
     args = [str(exe), "-hide_banner", "-loglevel", "error", "-y"]
 
@@ -122,7 +125,7 @@ def build_encode_args(
     args += ["-i", str(src)]
     if opts.trim_start is not None or opts.trim_end is not None:
         # -to가 아니라 -t를 쓴다. 버전별 타임라인 해석 차이를 피하기 위해서다.
-        args += ["-t", str(float(clip_duration(meta, opts)))]
+        args += ["-t", str(float(duration))]
 
     args += ["-vf", _filtergraph(mode, meta, opts)]
     args += list(ENCODE_TAIL)

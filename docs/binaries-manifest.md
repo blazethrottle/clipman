@@ -15,6 +15,16 @@ yt-dlp의 release `SHA2-256SUMS`와 실행파일 해시를 대조함. ffmpeg arc
 
 기존 변환 검사 5개를 이 기기의 실제 실행파일로 통과함. 통제된 로컬 HTTP 합성 영상으로 구간 가져오기 1개도 실행함. YouTube 네트워크 획득, 전송량, 브라우저 쿠키와 macOS 바이너리는 아직 미검증임. `bin/`은 gitignore이며 다른 기기로 자동 배포되지 않음.
 
+## 별도 검수 복제본의 8.x 검증
+
+| 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
+|---|---|---|---|---|---|---|
+| yt-dlp | Windows 검수 복제본 조달 | Windows x64 | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe | `66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a` | 2026-10-12 |
+| ffmpeg | Windows 검수 복제본 조달 | Windows x64 | 8.1.2 essentials | https://github.com/GyanD/codexffmpeg/releases/download/8.1.2/ffmpeg-8.1.2-essentials_build.zip | `1326dde4c84ff1f96fe6b8916c5bed29e163e9b5dccf995f6f3db069d143ec5e` | 2026-10-12 |
+| ffprobe | Windows 검수 복제본 조달 | Windows x64 | 8.1.2 essentials | 위와 같은 ffmpeg 배포 압축파일 | `b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07` | 2026-10-12 |
+
+Windows 검수 복제본: `C:/Users/DREAMUS/projects/clipman-review-20261012`. 다른 기기와 macOS의 조달 상태는 확인하지 않았다. 실행파일은 저장소에 포함하지 않는다. ffmpeg 배포 ZIP의 SHA256 `db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec`를 배포처 checksum과 대조했다. yt-dlp도 배포처 SHA2-256SUMS와 대조했다.
+
 ## 조달 절차
 
 1. 플랫폼 판별: macOS는 `uname -m`으로 `arm64`(Apple Silicon) / `x86_64`(Intel)를 확인한다.

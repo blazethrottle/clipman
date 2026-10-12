@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -66,7 +67,7 @@ def _duration_seconds(data: dict, video: dict) -> float:
             value = float(raw)
         except (TypeError, ValueError):
             continue
-        if value > 0:
+        if isfinite(value) and value > 0:
             return value
     raise ProbeError("영상 길이를 읽을 수 없습니다. 손상된 파일이거나 지원하지 않는 형식입니다.")
 

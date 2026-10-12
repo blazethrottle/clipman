@@ -230,16 +230,18 @@ QUEUED --start--> DOWNLOADING --(성공)--> DOWNLOADED --(편집 제출)--> ENCO
 
 ## 6. 작업 수명주기, 진행률, 취소, 정리
 
+2026-10-12 검수 정정: 아래 부모 Popen 종료만으로 취소를 보장한다는 설명은 폐기한다. [연결 및 취소 계약](2026-10-12-clipman-engine-contract.md)의 프로세스 트리 종료, 종료 대기, 정리 순서를 적용한다.
+
 - **진행률: 폴링.** `GET /api/jobs/{id}`를 500ms~1s 간격. 단일 사용자 로컬 앱에 가장 단순하고 견고하다. progress는 status별로 0~1(UI에 "다운로드 40%", "인코딩 70%").
-- **취소(정정).** JobState의 `_proc`(Popen)를 `terminate()` 후 응답 없으면 `kill()` 한다. yt-dlp도 ffmpeg도 실행파일이라 프로세스 핸들이 있으므로 다운로드/인코딩 모두 실제로 멈춘다(라이브러리였다면 다운로드 취소가 불가능했다).
+- **취소(정정).** 작업이 소유한 프로세스 트리 전체를 종료하고 종료를 기다린다. macOS 프로세스 그룹과 Windows Job Object의 세부 계약은 연결 및 취소 계약을 따른다. 부모 Popen 종료만으로 실제 취소를 보장하지 않는다.
 - **정리(정정).** 폴더 구조를 둘로 나눈다. 다운로드 원본은 `work/<job_id>/source.*`에 **보존**하고, 인코딩 중간물만 `work/<job_id>/tmp/`에 두어 export마다 정리한다. 취소/실패 시 삭제 범위: 다운로드 단계 취소면 그 job 폴더 통째로, 인코딩 단계 취소면 `tmp/`와 미완성 출력만(원본은 보존해 재편집이 재다운로드를 강제하지 않게). 완성된 쇼츠는 `output/`로 원자적 이동(`os.replace`). Windows에서 핸들 잔류로 삭제가 실패할 수 있으므로 `rmtree(ignore_errors=True)` + 시작 시 오래된 job 폴더 스윕을 병행한다.
 
 ---
 
 ## 7. 다운로드 설계 (yt-dlp subprocess)
 
-- **미리보기:** `yt-dlp -J --no-warnings <url>`로 JSON을 받아 title, duration, thumbnail, formats를 파싱한다. formats에서 height별로 정리한 `qualities[]`를 `/api/metadata`가 반환해 UI가 실제 화질 목록을 준다.
-- **다운로드:** `yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" --merge-output-format mp4 --ffmpeg-location <bin> -o "<work>/source.%(ext)s" --newline --progress-template "download:%(progress.downloaded_bytes)s/%(progress.total_bytes)s/%(progress.total_bytes_estimate)s" <url>`. stdout을 줄 단위로 읽어 진행률을 계산한다(total_bytes 부재 시 estimate로 폴백).
+- **미리보기:** `yt-dlp --ignore-config --no-playlist -J --no-warnings <url>`로 JSON을 받아 title, duration, thumbnail, formats를 파싱한다. formats에서 height별로 정리한 `qualities[]`를 `/api/metadata`가 반환해 UI가 실제 화질 목록을 준다.
+- **다운로드:** `yt-dlp --ignore-config --no-playlist -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" --merge-output-format mp4 --ffmpeg-location <bin> -o "<work>/source.%(ext)s" --newline --progress-template "download:download:%(progress.downloaded_bytes)s/%(progress.total_bytes)s/%(progress.total_bytes_estimate)s" <url>`. stdout을 줄 단위로 읽어 진행률을 계산한다(total_bytes 부재 시 estimate로 폴백).
 - **취소:** Popen 핸들 terminate.
 - **봇 차단 폴백(로컬 강점, 순서 확정 2026-09-03):** stdout/stderr에 `Sign in to confirm you're not a bot`가 뜨면 순서대로 재시도한다. (1) `--cookies FILE`(사용자가 내보낸 쿠키 파일이 있을 때) (2) `--cookies-from-browser`(macOS는 `chrome` 다음 `safari`, Windows는 `chrome`) (3) `--extractor-args "youtube:player_client=..."` 교체 (4) yt-dlp 업데이트 안내.
 - **업데이트:** `POST /api/system/update-ytdlp`가 `yt-dlp -U`를 실행한다. 실행파일 자체 갱신이라 파이썬 재시작이 필요 없다(라이브러리 방식 대비 이점).
@@ -249,6 +251,8 @@ QUEUED --start--> DOWNLOADING --(성공)--> DOWNLOADED --(편집 제출)--> ENCO
 ---
 
 ## 8. 편집 설계 (ffmpeg)
+
+2026-10-12 검수 정정: 인코딩 전 유한한 원본 길이와 `0 <= trim_start < trim_end <= duration`을 검사한다. 결과는 종료코드와 크기뿐 아니라 ffprobe의 유효한 영상 스트림, 길이, 해상도와 원본 음성 유지까지 검사해야 한다. 재생목록 전용 URL은 거부하고 시청 URL에 list가 있어도 해당 영상 하나만 처리한다. yt-dlp 진행률의 첫 `download:`는 출력 종류이며 두 번째가 실제 출력 접두사다.
 
 구간 컷은 재인코딩 경로로 통일한다(세로 변환이 이미 재인코딩을 요구). 명령은 `-ss START -i input -t DURATION`로 고정해 빠른 시크와 프레임 정확성을 함께 얻고, `-to` 대신 `-t`로 버전별 타임라인 혼선을 차단한다.
 
@@ -322,14 +326,14 @@ def binary_path(name: str) -> Path:                       # name: "ffmpeg" | "ff
 | `timed out`, `Connection`, `5xx` | NETWORK | 지수 백오프 재시도 | 네트워크 문제로 재시도합니다. |
 | 그 외 실패 | DOWNLOAD_FAILED | 없음(즉시 실패) | 다운로드 실패. (stderr 마지막 N줄 접힌 상세) |
 
-편집(ffmpeg): 성공/실패는 종료코드로만(0=성공, 그 외 실패), 종류는 stderr 패턴으로. `-hide_banner -loglevel error`로 오류 라인만 남긴다. v1은 크롭 범위 초과만 별도 처리(사용자가 고칠 수 있으므로), 나머지는 generic.
+편집(ffmpeg): 종료코드가 0이고 출력의 영상 스트림, 유효한 길이, 해상도와 필요한 음성 유지 검사를 통과한 경우에만 성공이다. 실패 종류는 stderr와 출력 검사 결과로 판정한다. `-hide_banner -loglevel error`로 오류 라인만 남긴다. v1은 크롭 범위 초과만 별도 처리(사용자가 고칠 수 있으므로), 나머지는 generic.
 
 | stderr 패턴 | error_code | 사용자 메시지 |
 |---|---|---|
 | `Invalid too big or non positive size` | CROP_OUT_OF_RANGE | 자를 영역이 영상 크기를 벗어났습니다. 크롭을 줄이세요. |
 | 그 외 실패 | ENCODE_FAILED | 편집 실패. (stderr 마지막 N줄 접힌 상세) |
 
-추가 판정: 종료코드 0이어도 출력 파일이 없거나 크기 0이면 실패로 본다(항상 재검증).
+추가 판정: 존재하고 크기가 양수인 파일도 빈 MP4 헤더일 수 있다. ffprobe 출력 검증은 필수이며 실패 시 최종 경로로 옮기지 않는다.
 
 ---
 

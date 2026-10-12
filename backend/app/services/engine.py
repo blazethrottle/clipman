@@ -76,8 +76,6 @@ class Engine:
         try:
             args = ytdlp.build_download_args(job.selection.url, job.quality, job.work_dir,
                 ffmpeg_dir=paths.BIN_DIR, exe=binaries.require(binaries.YTDLP), selection=job.selection)
-            # 외부 yt-dlp 사용자 설정이 구간과 저장 경로를 바꾸지 않게 한다.
-            args[1:1] = ["--ignore-config"]
             self._run(job_id, generation, args, ytdlp.parse_progress_line)
             sources = [p for p in job.work_dir.glob("source.*") if p.suffix.lower() in {".mp4", ".mkv", ".webm", ".mov"}]
             if len(sources) != 1:
