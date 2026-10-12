@@ -1,7 +1,7 @@
 # clipman 개발 아키텍처 (Development Architecture)
 
 - 작성일: 2026-09-01 (KST), 적대적 리뷰(4개 렌즈) 반영 확정본
-- 상태: 2026-09-03 승인된 로컬 엔진 및 이전 API 설계. **2026-10-12 Chrome 확장 + 로컬 처리 방향 승인으로 입력, 연결, 구간 획득과 UI 계약 개정 대상임.**
+- 상태: 2026-09-03 로컬 엔진 설계에 **2026-10-12 Chrome 연결과 구간 시각 계약을 1절에 개정함.** 아래 이전 API와 SPA 설명은 개정 계약과 충돌하면 이력으로만 참조함.
 - 현재 우선순위: [2026-10-12 승인 설계](2026-10-12-clipman-capture-first-design.md)와 [핸드오프](../../HANDOFF.md)를 먼저 읽는다. 이 문서의 전체 다운로드 선행 및 독립 SPA 구조는 새 제품 형태를 덮어쓰지 않는다. 아직 새 API와 연결 계약이 구현됐다는 뜻은 아니다.
 - 정정 이력: 2026-09-03에 대상 플랫폼을 macOS 1순위 + Windows 병행(크로스플랫폼)으로 확정하고, Windows 전제로 남아 있던 서술(`.exe` 하드코딩, `start.cmd` 단독, 1절/3절 표현)을 정정했다. 판정 근거는 `docs/HANDOFF.md` 4절.
 - 상위 문서: `2026-09-01-clipman-design.md` (서비스/UI/UX/개념 아키텍처)
@@ -28,6 +28,20 @@
 ---
 
 ## 1. 시스템 개요
+
+### 2026-10-12 Chrome 흐름 개정 계약
+
+이 절은 아래의 이전 SPA 진입 및 전체 다운로드 요청 계약보다 우선함. 초기 연결은 `Chrome MV3 확장 -> 127.0.0.1 FastAPI -> 번들 실행파일`임. content script는 현재 영상 ID/URL과 시작/끝을 읽고, 서비스 워커가 로컬 요청을 중계하며 사이드 패널은 선택과 상태, Svelte/Vite 편집 탭은 정밀 구도 조절을 담당함. API와 확장은 아직 미구현임.
+
+- 연결: loopback 전용, 단일 워커. 최초 연결에 실제 포트와 무작위 세션 토큰을 사용함. 서버는 Host, 허용된 확장 Origin과 토큰을 검사해야 함. 임의 웹 Origin, DNS rebinding과 토큰 없는 변경 요청을 거부함. Native Messaging은 첫 구현에 채택하지 않음.
+- `POST /api/jobs`: `{video_id, url, start_sec, end_sec, quality}`를 받는 선택 구간 확보 요청으로 개정함. 시작/끝은 YouTube 원본 시각이며 `0 <= start < end`, 모든 시각은 유한값이어야 함. URL의 영상 ID와 별도 ID가 다르면 거부함. URL을 검증하고 단일 watch URL로 정규화함.
+- `Selection`은 영상 식별 및 원본 선택을 보존함. `SourceTimeline(origin_start_sec, duration_sec)`은 확보 파일의 로컬 0초가 원본 몇 초인지와 실제 ffprobe 길이를 저장함. 예: 원본 120~135초, 파일 origin=120이면 로컬 2~5초 편집은 원본 122~125초임. 요청 시작을 실측값으로 오인하지 않음. 획득 서비스는 정밀 컷과 실제 장면 검증 후 origin을 등록함.
+- export의 `EditOptions.trim_start/trim_end`는 항상 확보 파일의 로컬 초임. `SourceTimeline.original_range`에서 음수, 역전, NaN, 무한대와 파일 길이 초과를 거부함. 원본 URL과 선택 범위 및 매핑은 작업 자료에 유지함.
+- 구간 명령은 기존 다운로드 인자에 `--no-playlist --download-sections '*START-END' --force-keyframes-at-cuts`를 추가함. 정밀 컷의 처리 비용과 전송량은 별도로 실측함. 전체 다운로드는 기존 어댑터 호출로만 남으며 API 기본 흐름에 넣지 않음.
+- M2 `JobManager`는 잠금으로 레지스트리를 보호하며 호출자에게 분리된 상태 사본을 반환함. 다운로드 및 인코딩 시작마다 `generation`을 증가시킴. 진행률/완료/오류/프로세스 등록은 해당 generation에만 적용함. 취소 뒤 늦은 콜백이 완료로 바꾸거나 과거 인코딩 콜백이 새 출력에 영향을 주면 안 됨.
+- 취소는 QUEUED/DOWNLOADING/ENCODING에서만 허용함. 다운로드 취소는 해당 job 폴더, 인코딩 취소는 해당 job의 tmp만 삭제함. 종료를 확인한 뒤 정리함. ERROR/CANCELED에 보존 원본이 있으면 재편집 가능함. 완성 출력은 삭제하지 않음. ERROR에 남은 다운로드 잔여 파일의 정리는 M3 서비스가 맡음.
+- Popen 소유권은 작업 관리자에 등록한 프로세스에 한함. M2는 해당 프로세스의 terminate/wait/kill을 담당함. yt-dlp가 만든 ffmpeg 등 자식 프로세스의 트리 종료는 M3의 실행 계층에서 플랫폼별 구현 및 실측이 필요함. 이를 완료하지 않으면 다운로드 취소의 종단 관문을 통과한 것으로 보지 않음.
+- 상세 순서와 이번 착수 범위는 [새 구현 계획](../plans/2026-10-12-clipman-capture-implementation-plan.md)을 따름.
 
 전부 사용자 PC 안에서 동작하는 로컬 3계층이다(macOS 1순위, Windows 병행). 브라우저는 화면만, 로컬 파이썬 서버가 번들 실행파일을 호출해 무거운 처리를 한다.
 

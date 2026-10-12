@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.capture import Selection, canonical_video_url
+
 # yt-dlp가 stdout에 찍을 진행률 형식. 세 값 모두 없을 수 있어 파서가 방어한다.
 PROGRESS_TEMPLATE = (
     "download:%(progress.downloaded_bytes)s"
@@ -95,6 +97,8 @@ def build_download_args(
     cookies_from_browser: str | None = None,
     player_client: str | None = None,
     exe: Path | str = "yt-dlp",
+    *,
+    selection: Selection | None = None,
 ) -> list[str]:
     """원본을 work/<job>/source.<ext>로 받는다. 원본 보존이 재편집의 전제다."""
     args = [
@@ -122,6 +126,13 @@ def build_download_args(
     if player_client:
         args += ["--extractor-args", f"youtube:player_client={player_client}"]
 
+    if selection is not None:
+        url = canonical_video_url(selection.video_id, url)
+        args += [
+            "--no-playlist", "--download-sections",
+            f"*{selection.start_sec}-{selection.end_sec}",
+            "--force-keyframes-at-cuts",
+        ]
     args.append(str(url))
     return args
 

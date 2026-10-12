@@ -7,9 +7,13 @@
 
 | 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
 |---|---|---|---|---|---|---|
-| yt-dlp | 미조달 | | | | | |
-| ffmpeg | 미조달 | | | | | |
-| ffprobe | 미조달 | | | | | |
+| yt-dlp | 이 Windows 기기에 조달 | Windows / x64 | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe | `66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a` | 2026-10-12 |
+| ffmpeg | 이 Windows 기기에 조달 | Windows / x64 | 9.0.2 essentials | https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip | `3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec` | 2026-10-12 |
+| ffprobe | 이 Windows 기기에 조달 | Windows / x64 | 9.0.2 essentials | 위 ffmpeg archive와 동일 | `f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52` | 2026-10-12 |
+
+yt-dlp의 release `SHA2-256SUMS`와 실행파일 해시를 대조함. ffmpeg archive는 공급자 `.sha256`의 `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`와 대조 후 두 실행파일을 추출함. 공급자 체크섬 대조이며 별도 서명 검증은 수행하지 않음. 위 gyan URL은 가변 URL이므로 재조달 시 같은 파일인지 해시로 확인함.
+
+기존 변환 검사 5개를 이 기기의 실제 실행파일로 통과함. 통제된 로컬 HTTP 합성 영상으로 구간 가져오기 1개도 실행함. YouTube 네트워크 획득, 전송량, 브라우저 쿠키와 macOS 바이너리는 아직 미검증임. `bin/`은 gitignore이며 다른 기기로 자동 배포되지 않음.
 
 ## 조달 절차
 

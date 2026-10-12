@@ -1,5 +1,7 @@
 # clipman v1 구현 계획 (Implementation Plan)
 
+M2 이후 실행 순서는 [2026-10-12 Chrome 발췌 흐름 계획](2026-10-12-clipman-capture-implementation-plan.md)으로 대체함. 아래는 M1 구현과 이전 계획의 이력임.
+
 - 작성일: 2026-09-03 (KST)
 - 상태: 9월 승인된 이전 구현 계획. **M1 어댑터 상태의 참고이며 M2 이후 순서는 2026-10-12 승인된 Chrome 확장 + 로컬 처리 방향으로 갱신해야 함.**
 - 먼저 읽기: [최신 승인 설계](../specs/2026-10-12-clipman-capture-first-design.md)와 [핸드오프](../../HANDOFF.md). 승인된 제품 목적과 초기 형태를 다시 승인받지 않는다. 이 계획의 전체 다운로드 및 독립 웹앱 UI 순서를 변경 없이 실행하지 않는다.
