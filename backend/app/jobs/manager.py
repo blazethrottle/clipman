@@ -120,7 +120,7 @@ class JobManager:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=2)
-        # 부모가 먼저 끝나도 TERM을 무시하는 POSIX 자식 그룹을 남기지 않는다.
+        # 부모가 먼저 끝나도 소유한 Windows Job 또는 POSIX 자식 그룹을 정리한다.
         if isinstance(proc, OwnedProcess):
             proc.kill()
 
@@ -151,6 +151,8 @@ class JobManager:
                 return False
             if proc.poll() is None:
                 raise InvalidTransition("프로세스가 아직 종료되지 않았습니다.")
+            if isinstance(proc, OwnedProcess):
+                proc.close_tree()
             job._proc = None
             return True
 

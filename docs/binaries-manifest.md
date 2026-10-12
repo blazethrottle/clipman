@@ -17,6 +17,8 @@ yt-dlp의 release `SHA2-256SUMS`와 실행파일 해시를 대조함. ffmpeg arc
 
 ## 별도 검수 복제본의 8.x 검증
 
+아래 검수의 최신 검사와 실제 YouTube 성공/시간 초과는 [검증 기록](verification/2026-10-12-media-contract-review.md)을 따른다. 위 단락의 네트워크 미검증 표기는 초기 조달 시점 기록이다.
+
 | 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
 |---|---|---|---|---|---|---|
 | yt-dlp | Windows 검수 복제본 조달 | Windows x64 | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe | `66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a` | 2026-10-12 |

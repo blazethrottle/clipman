@@ -40,7 +40,7 @@
 - 구간 명령은 기존 다운로드 인자에 `--no-playlist --download-sections '*START-END' --force-keyframes-at-cuts`를 추가함. 정밀 컷의 처리 비용과 전송량은 별도로 실측함. 전체 다운로드는 기존 어댑터 호출로만 남으며 API 기본 흐름에 넣지 않음.
 - M2 `JobManager`는 잠금으로 레지스트리를 보호하며 호출자에게 분리된 상태 사본을 반환함. 다운로드 및 인코딩 시작마다 `generation`을 증가시킴. 진행률/완료/오류/프로세스 등록은 해당 generation에만 적용함. 취소 뒤 늦은 콜백이 완료로 바꾸거나 과거 인코딩 콜백이 새 출력에 영향을 주면 안 됨.
 - 취소는 QUEUED/DOWNLOADING/ENCODING에서만 허용함. 다운로드 취소는 해당 job 폴더, 인코딩 취소는 해당 job의 tmp만 삭제함. 종료를 확인한 뒤 정리함. ERROR/CANCELED에 보존 원본이 있으면 재편집 가능함. 완성 출력은 삭제하지 않음. ERROR에 남은 다운로드 잔여 파일의 정리는 M3 서비스가 맡음.
-- Popen 소유권은 작업 관리자가 잠금 안에서 생성하고 등록한 프로세스에 한함. processes.py가 Windows taskkill /T /F와 POSIX 전용 세션 그룹 종료를 담당함. 부모가 먼저 끝나도 POSIX 잔여 그룹에 KILL을 보냄. Windows 트리 종료는 실제 부모/자식으로 검사했고 POSIX 분기는 대역 검사만 완료함. 출력 검증 후 게시와 완료 등록은 같은 잠금 안에서 진행함.
+- Popen 소유권은 작업 관리자가 잠금 안에서 생성하고 등록한 프로세스에 한함. processes.py가 Windows Job Object와 POSIX 전용 세션 그룹 종료를 담당함. Windows는 대상 실행 전에 Job에 할당하고 부모 선행 종료 후에도 남은 자식을 종료함. 부모가 먼저 끝나도 POSIX 잔여 그룹에 KILL을 보냄. Windows 트리 종료는 실제 부모/자식으로 검사했고 POSIX 분기는 대역 검사만 완료함. 출력 검증 후 게시와 완료 등록은 같은 잠금 안에서 진행함.
 - 구현된 API는 GET /api/connect, POST /api/jobs, GET/DELETE /api/jobs/{id}, POST /api/jobs/{id}/export, GET/HEAD source 및 outputs/{index}임. 아래 이전 metadata, reveal 및 system/update-ytdlp는 아직 구현하지 않음. source/outputs는 정확한 경로별 HMAC 읽기 ticket으로 비디오 재생/Range/다운로드를 지원함. ticket은 변경 요청의 인증으로 쓰지 않음. 응답은 실제 로컬 파일 경로와 Popen을 노출하지 않음.
 - 소스 시각의 origin_basis는 requested_precise_cut임. 영상 길이는 ffprobe로 확인하되 요청 시작을 실제 장면 시작의 실측값으로 승격하지 않음. 일반 영상의 장면 시각과 품질은 후속 검증함.
 - 폴더: extension/에 MV3 manifest와 content/background/shared, frontend/src/에 Svelte 패널/편집, frontend 빌드 결과는 extension/dist/임. 전체 런타임 JS는 확장 패키지에 포함함. 빌드 및 개인 ZIP은 gitignore하며 재현 명령은 README에 있음.

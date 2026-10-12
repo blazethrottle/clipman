@@ -6,6 +6,10 @@
 - 이번 개발 시작 기준: `54ae8c0` (당일 핸드오프 반영 main)
 - 이번 갱신은 Chrome MV3 확장, 처리 서비스/API 및 개인용 개발 릴리즈를 반영함. 일반 사용자 설치/스토어 게시의 완료는 아님
 
+## 검수 후속 보완 (별도 수정 브랜치)
+
+Draft PR #2의 `96f89e7` 위에서 진행률, 재생목록, 화질 상한과 편집 범위 검증을 수정함. Windows는 부모가 먼저 종료해도 자식을 정리하는 Job Object 방식으로 보강함. 기존 Selection, Chrome 연결과 UI를 유지함. 기본 199개 및 실물 통합 13개를 포함해 총 212 passed, skipped 0을 확인함. 실제 YouTube 한 영상에서 구간 확보와 음성 포함 1080x1920 MP4 저장을 확인했고 다른 영상은 시간 초과함. [검증 상세](verification/2026-10-12-media-contract-review.md)와 [갱신 계약](superpowers/specs/2026-10-12-clipman-engine-contract.md)을 참조함. main 병합 및 기존 개인 배포물 재패키징은 수행하지 않음.
+
 ## 최신 연결 개발 결과
 
 - Chrome MV3 content script, 서비스 워커, 구간 선택 패널 및 Svelte 편집 탭을 구현함. 구간 확보 -> 크롭/PAD -> MP4 저장, 재편집, 탭 변경/영상 이동, 미저장 설정의 새로고침 복원을 브라우저에서 확인함.
