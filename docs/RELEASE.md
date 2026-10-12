@@ -27,6 +27,8 @@ Windows와 macOS에서 임의 CRX 파일이나 자체 서버를 이용한 일반
 
 ## 설치용 ZIP의 의미
 
+[GitHub에 기록한 개인용 ZIP](artifacts/clipman-extension-0.2.0-personal.zip)과 [SHA256](artifacts/clipman-extension-0.2.0-personal.zip.sha256)을 내려받을 수 있음. 빌드 생성 경로는 아래 release/이며 저장소 보관본과 바이트를 대조함.
+
 `release/clipman-extension-0.2.0-personal.zip`은 확장만 포함함. 압축을 풀어 계속 유지할 폴더를 로드하는 개인 시험용 패키지임. Python 서버, ffmpeg와 yt-dlp 또는 이 PC의 연결 키는 포함하지 않음. 이번 패키지를 다른 기기에서 여는 것만으로 로컬 영상 처리가 설치되는 것은 아님.
 
 이 PC에서는 기존 clipman 작업 폴더의 로컬 처리 프로그램을 함께 사용함. 다른 Windows PC나 Mac에서의 첫 설치는 환경 및 해당 플랫폼 실행파일 조달이 필요함. 일반 사용자용 독립 설치 프로그램, 자동 업데이트와 macOS 서명/공증은 후속 작업이며 완료됐다고 표시하지 않음. macOS 실행기 코드는 추가했으나 실기기 실행은 미검증임.
@@ -39,4 +41,4 @@ Windows와 macOS에서 임의 CRX 파일이나 자체 서버를 이용한 일반
 
 확장의 실행 JavaScript는 패키지에 포함하고 외부 JavaScript를 실행하지 않음. 로컬 프로그램은 데이터와 영상을 처리하는 별도 구성요소이며 설치 필요와 기능을 설명하고 심사자가 실행할 수 있는 절차를 제공해야 함. 스토어용 확장 ID/공개 key가 결정되면 로컬 프로그램의 허용 확장 ID도 일치시켜 재검증해야 함. 개인용 ID로 한 검사가 스토어 ID 연결 검증까지 대신하지 않음. [MV3 요건](https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements)
 
-업로드, 등록비 결제, 심사 제출, 공개 게시, GitHub Release 게시와 제3자 바이너리 재배포는 이번에 수행하지 않음.
+스토어 업로드, 등록비 결제, 심사 제출, 공개 게시, GitHub Release 게시와 제3자 바이너리 재배포는 이번에 수행하지 않음.

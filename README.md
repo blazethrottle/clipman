@@ -27,6 +27,8 @@ YouTube를 보다가 마음에 드는 영상의 특정 부분을 발췌하고 �
 
 ## 문서
 
+- 이번 개발과 릴리즈 기록: [2026-10-12 세션 기록](docs/SESSION-2026-10-12.md)
+
 - 최신 승인 설계: [2026-10-12 제품 및 초기 형태](docs/superpowers/specs/2026-10-12-clipman-capture-first-design.md)
 - 레퍼런스 조사: [공개 코드와 적용 조건](docs/research/2026-10-12-reference-review.md)
 - 영상 확보와 플랫폼 검토: [구간 확보 및 녹화](docs/research/2026-10-12-capture-options.md)

@@ -38,3 +38,7 @@ Starlette가 기존 httpx 기반 TestClient의 향후 변경을 안내하는 경
 ## 남은 관문
 
 본인 Chrome에서 로컬 확장/처리 프로그램을 최초 설치하고 실제 YouTube 시청부터 저장까지 인수, 다양한 영상의 장면 시각/품질/전송량, Mac/모바일 실기기, 일반 설치/업데이트, 스토어 정책 심사와 등록/게시가 남음. 릴리즈 방식은 docs/RELEASE.md를 따름.
+
+## GitHub 기록용 패키지 보완
+
+개인 ZIP을 docs/artifacts에 기록하기 전에 번들 제3자 런타임의 라이선스 고지를 추가함. 기존 브라우저 검사 패키지의 JavaScript/HTML/CSS/manifest 및 설치 안내가 새 빌드와 바이트 단위로 동일함을 확인함. 변경은 정적 고지 파일 1개이며 전체 ZIP의 압축 검사, 내용 대조와 해시를 새로 확인함. 새 해시는 personal-package.json을 따름. 화면 3개는 logs의 검토본을 docs/screenshots/2026-10-12로 복사하고 바이트 일치를 확인함.

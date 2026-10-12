@@ -15,7 +15,7 @@ def main():
     if manifest['manifest_version'] != 3 or not re.fullmatch(r'\d+(\.\d+){1,3}', version):
         raise ValueError('확장 버전 또는 manifest가 올바르지 않습니다.')
     required = ['manifest.json', manifest['background']['service_worker'],
-                manifest['side_panel']['default_path'], 'editor.html', 'shared.js']
+                manifest['side_panel']['default_path'], 'editor.html', 'shared.js', 'THIRD_PARTY_NOTICES.txt']
     required += [script for entry in manifest['content_scripts'] for script in entry['js']]
     for name in required:
         if not (BUILD / name).is_file():
