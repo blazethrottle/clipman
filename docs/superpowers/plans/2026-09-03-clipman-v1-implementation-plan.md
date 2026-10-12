@@ -1,7 +1,8 @@
 # clipman v1 구현 계획 (Implementation Plan)
 
 - 작성일: 2026-09-03 (KST)
-- 상태: 확정. 사인오프 완료된 설계 문서 2건을 입력으로 작성
+- 상태: 9월 승인된 이전 구현 계획. **M1 어댑터 상태의 참고이며 M2 이후 순서는 2026-10-12 승인된 Chrome 확장 + 로컬 처리 방향으로 갱신해야 함.**
+- 먼저 읽기: [최신 승인 설계](../specs/2026-10-12-clipman-capture-first-design.md)와 [핸드오프](../../HANDOFF.md). 승인된 제품 목적과 초기 형태를 다시 승인받지 않는다. 이 계획의 전체 다운로드 및 독립 웹앱 UI 순서를 변경 없이 실행하지 않는다.
 - 입력 문서: `docs/superpowers/specs/2026-09-01-clipman-architecture.md`(구현 정본), `docs/superpowers/specs/2026-09-01-clipman-design.md`(제품 의도), `docs/HANDOFF.md` 4절(플랫폼 판정)
 - 범위: v1 = 다운로드 + 구간 자르기 + 세로 9:16 변환(CROP/PAD) + 내보내기
 

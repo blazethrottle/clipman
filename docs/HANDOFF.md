@@ -1,107 +1,119 @@
-# clipman 핸드오프 (Windows 기획 세션 -> macOS 개발 세션)
+# clipman 개발 핸드오프
 
-- 작성일: 2026-09-01 (KST) / 갱신: 2026-09-03 (M0 착수 관문 판정 반영), 2026-10-10 (M0·M1 산출물 main 병합 반영)
-- 배경: 기획과 개발 아키텍처 확정까지를 Windows PC에서 완료했고, 이후 개발은 macOS(맥북)에서 이어간다.
-- 진본 위치: GitHub `blazethrottle/clipman` (SSH). macOS에서 `git clone` 후 아래 순서로 읽고 시작한다.
+- 갱신일: 2026-10-12, 서울 기준
+- 사용자 승인: 제품 목적, 초기 Chrome 확장 + 로컬 처리 프로그램 방향과 이번 세션의 내용을 GitHub에 기록하고 다음 개발 세션으로 넘기는 것
+- 저장소: `https://github.com/blazethrottle/clipman`, 기본 브랜치 `main`
+- 구현 기준 커밋: `636341d8a3843313e50d46cff8ee8fac5cba46c0`
+- 이 갱신은 제품 결정, 조사와 인계 문서 작업임. 제품 기능을 새로 구현한 커밋이 아님
 
-## 1. 프로젝트 개요
+## 1. 현재 승인된 방향
 
-YouTube 영상을 받아 세로 9:16 쇼츠로 편집하는 개인용 로컬 도구. 다운로드부터 쇼츠 완성까지 한 흐름으로 통합하는 것이 존재 이유다. 형태는 로컬 웹앱(브라우저 UI + 로컬 파이썬 서버가 번들 실행파일 호출), 스택은 Python + FastAPI + yt-dlp + ffmpeg + Svelte/Vite.
+클립맨은 **YouTube 시청 중 마음에 든 구간을 발췌하고 인용해 쇼츠로 재편집하는 도구**임. 팬덤 또는 한국어 콘텐츠 특화가 아님. 다운로드는 구간 확보 수단이며 전체 원본 다운로드를 필수 선행 단계로 두지 않음.
 
-## 2. 완료 작업
+**초기 제품은 Chrome 확장 + 로컬 영상 처리 프로그램으로 진행함.** Chrome에서 영상을 보며 시작과 끝을 표시하고, 구간과 세로 구도를 확인한 뒤 쇼츠를 저장함. 확장 외에 최초 로컬 프로그램 설치가 필요함을 숨기지 않음. 로컬 엔진은 macOS 우선 및 Windows 호환을 유지함.
 
-- 서비스 기획, UI/UX 기획: `docs/superpowers/specs/2026-09-01-clipman-design.md`
-- 개발 아키텍처 확정본(스택 검증 + 4개 렌즈 적대적 리뷰 반영): `docs/superpowers/specs/2026-09-01-clipman-architecture.md`
-- 벤치마크(cobalt.tools) 코드 분석: `docs/cobalt-analysis.html`
-- Web vs App 판단: 로컬 웹앱 확정. yt-dlp/ffmpeg는 번들 실행파일 + subprocess 호출로 확정(취소, 자체 업데이트, 실행 모델 통일 때문)
-- git 초기화 + 최초 커밋 + GitHub 푸시 완료
+**최종 모바일 목표는 iOS와 Android에서 발췌, 편집과 저장까지 완료하는 것임.** URL을 PC로 전달하는 기능으로 축소하지 않음. 모바일 출시 순서와 최소 OS 버전은 아직 결정하지 않았고 실제 영상 및 음성 확보는 미검증임.
 
-## 3. 진행 상태 (2026-09-03 갱신)
+UI는 가볍고 쾌적하며 단순하지만 깔끔하고 예뻐야 함. 시청 중에는 구간 표시, 편집 시에는 미리보기, 구간과 구도 조절, 쇼츠 만들기에 집중함. 색과 서체, 패널 및 탭의 상세 배치는 시안으로 확인할 항목임.
 
-M0(착수 관문) 완료. 관문 4개가 모두 닫혔다.
+## 2. 읽기 순서와 문서 우선순위
 
-| 관문 | 상태 | 산출물 |
+1. 이 문서
+2. [최신 승인 설계](superpowers/specs/2026-10-12-clipman-capture-first-design.md)
+3. [레퍼런스와 적용 조건](research/2026-10-12-reference-review.md)
+4. [구간 확보 및 플랫폼 검토](research/2026-10-12-capture-options.md)
+5. 구현할 부분에 해당하는 기존 아키텍처, 계획, 테스트와 코드
+
+제품 의도와 초기 형태는 **2026-10-12 설계가 정본**임. 9월 설계의 팬덤 시나리오, URL 입력 우선, 전체 다운로드 선행, 독립 로컬 웹앱 3화면과 더블클릭 단독 진입은 최신 결정을 덮어쓸 수 없음.
+
+9월 아키텍처의 로컬 엔진과 API는 구현 참고임. Chrome 연결 계약과 선택 구간의 시각 모델을 아직 반영하지 않았으므로 다음 세션에서 코드보다 먼저 갱신함. 기존 M2~M5 계획도 새 흐름에 맞춰 재배치함. 이미 승인된 목적과 초기 형태를 다시 승인받지 않음. 일반 구현 선택은 근거를 기록해 진행하고 목적이나 사용자 경험을 바꾸는 선택만 합의함.
+
+기기의 공통 지침과 필요한 관련 지식을 사용하되, 이 공개 저장소만 읽어도 승인과 다음 작업을 이해할 수 있어야 함. 과거 프로젝트 입구 문서가 최신 사용자 정정을 대신하지 않음.
+
+## 3. 실제 완료 및 미완료
+
+| 항목 | 상태 | 근거 |
 |---|---|---|
-| 사용자 사인오프 | **완료** | design/architecture 문서 상태 줄 갱신 |
-| macOS 재심 전제 7건 판정 | **완료** | 이 문서 4절 확정 판정 열 |
-| 아키텍처 정본 크로스플랫폼 정정 | **완료** | architecture 1, 2, 3, 7, 9, 13절 |
-| 구현 계획 수립(writing-plans) | **완료** | `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` |
+| M0 초기 설계와 계획 | 완료 이력 | 2026-09-03. 최신 방향으로 개정 필요 |
+| M1-1 경로 및 테스트 스캐폴딩 | 구현 완료 | `backend/app/paths.py`, requirements 및 pytest 설정 |
+| M1-2 바이너리 경로 | 구현 완료 | `wrappers/binaries.py` |
+| M1-3 메타 정보 파싱 | 구현 완료 | `wrappers/ffprobe.py`, 회전 및 음성 유무 |
+| M1-4 트림과 CROP/PAD 명령 | 구현 완료 | `wrappers/ffmpeg.py`, 진행률 파싱 |
+| M1-5 다운로드 명령과 오류 파싱 | 구현 완료 | `wrappers/ytdlp.py` |
+| M1-0 바이너리 조달 | 기록상 미완료 | manifest의 실행파일 3종이 미조달 |
+| M1-6 실제 변환 검증 | 미완료 | 통합 테스트 5개 작성, 실행파일 부재로 전부 skip |
+| 작업 관리자, 서비스와 API | 미구현 | jobs, services, routers와 main이 없음 |
+| Chrome 확장과 편집 UI | 미구현 | manifest, content script, side panel 및 frontend 없음 |
+| 최초 설치와 실행기 | 미구현 | `start.command`, `start.cmd` 없음 |
+| 모바일 앱 | 미구현 | iOS 및 Android 구현 및 실기기 검증 없음 |
 
-구현 순서는 계획서가 정본이며, 원 권장안(첫 수직 슬라이스: `wrappers/` 순수 어댑터 TDD -> `jobs/manager.py` -> `services/` -> FastAPI 라우터 -> Svelte UI)을 그대로 승계했다.
+기존 코드는 PR #1로 **2026-10-11 08:37 서울 기준** main에 병합됨. 10월 12일 신규 Windows Python 3.13 환경에서 requirements 설치 및 `pip check` 통과, 기본 테스트 **107 passed, 5 deselected**, 통합 검사 **5 skipped, 107 deselected**를 확인함. 단위 테스트 통과를 실제 영상 품질 검증으로 확대하지 않음.
 
-M1 wrappers 계층도 완료했다(단위 테스트 107개 통과, 번들 바이너리 없이).
+사용 Mac의 미푸시 변경과 로컬 `bin/`은 확인하지 못함. 다음 세션이 기기의 실제 상태와 manifest를 대조하고 이미 조달한 바이너리를 무조건 다시 받지 않음.
 
-| 마일스톤 | 상태 | 비고 |
-|---|---|---|
-| M1-1 스캐폴딩 (`requirements.txt`, `pyproject.toml`, `paths.py`) | **완료** | 의존성 버전 고정 |
-| M1-2 `wrappers/binaries.py` | **완료** | 실행파일 이름의 플랫폼 분기 단일 지점 |
-| M1-3 `wrappers/ffprobe.py` | **완료** | 회전 메타 처리, 오디오 유무 판정 |
-| M1-4 `wrappers/ffmpeg.py` | **완료** | CROP/PAD 조립, 자동 PAD 전환, 진행률 파싱 |
-| M1-5 `wrappers/ytdlp.py` | **완료** | 메타 조회, 다운로드 인자, 폴백 순서, 에러 4종 분류 |
-| M1-0 바이너리 조달 | **미완료** | 실사용 기기에서만 가능 |
-| M1-6 통합 검증 | **미완료** | 테스트는 작성됨(`tests/integration/`), 실행은 바이너리 조달 후 |
-| M2 이후 | 미착수 | `jobs/manager.py`부터 |
+## 4. 다음 세션의 즉시 작업
 
-**이 작업은 2026-10-10에 main으로 병합되었다**(`blazethrottle/clipman#1`). 이어받는 세션은 main에서 시작하면 된다.
+1. **상태 확인:** 저장소, 브랜치, 원격, 미커밋과 스테이징 변경을 확인함. 깨끗한 작업 트리만 `git pull --ff-only`로 갱신함.
+2. **기본 검증:** 가상환경에서 단위 테스트를 확인하고 기존 107개와 최신 코드의 차이가 있으면 설명함.
+3. **아키텍처와 계획 갱신:** Chrome 진입, 로컬 연결, 선택 구간 획득 및 원본 시각 매핑, 미리보기와 저장의 계약을 정의함. Native Messaging 또는 localhost, UI 프레임워크 및 폴더 배치는 구현자가 근거를 남겨 결정할 항목임.
+4. **핵심 UI 시안:** 구간 표시, 선택 구간 확인, 세로 편집과 처리 및 완료 상태를 연결함. 조작과 가독성을 먼저 확인하고 세부 장식을 다듬음.
+5. **실물 관문:** 바이너리 조달과 manifest를 확인하고 기존 통합 검사 5개가 실제 통과하도록 함. 전부 skipped로 관문을 닫지 않음.
+6. **구간 획득 검증:** `--download-sections`와 Chrome 탭 부분 녹화를 비교함. 선택 시각, 실제 파일의 시각과 길이, 음성, 전송량 및 대기를 기록함.
+7. **첫 연결 구현:** Chrome의 URL과 시작/끝을 로컬에 넘겨 선택 구간을 확보하고 CROP/PAD 편집 및 저장까지 연결함. 작업 상태, 실제 프로세스 취소와 원본 보존을 함께 테스트함.
 
-### 이어받는 즉시 할 일
+문서, UI와 순수 로직은 바이너리 없이 작업 가능함. 실물 환경을 사용할 수 없는 경우 독립 작업은 계속하되 영상 품질 관문은 미검증으로 남김. AI 자막, 자동 추천과 전역 라이브러리를 먼저 확대하지 않음.
 
-1. `bin/`에 실행파일 3종 조달 (M1-0). 절차는 `docs/binaries-manifest.md`.
-2. `./.venv/bin/pytest -m integration` 실행 (M1-6). 세 모드의 오디오 유지가 여기서 처음 실측된다.
-3. 통과하면 M2 `jobs/manager.py` 착수.
+## 5. 구현할 때 보존할 계약
 
-## 4. 재심 대상 전제 (판정 완료, 2026-09-03)
+- 선택 구간 가져오기를 우선 검증하고 부분 녹화를 대안으로 비교함. 전체 다운로드는 반복 재편집 등의 선택 경로임.
+- 부분 녹화로 지나간 장면을 자동 복구할 수 없음. 재재생 또는 사전 버퍼가 필요하며 항상 녹화하는 버퍼는 초기 범위에 포함하지 않음.
+- 잘라 받은 파일의 로컬 0초와 YouTube 원본 시각을 별도로 저장함. 컷과 출처 시각이 어긋나지 않아야 함.
+- 미리보기와 출력이 같은 트림 및 크롭 설정을 사용함. 표시 좌표를 원본 픽셀로 환산하고 화면 크기가 달라도 결과 위치가 일치해야 함.
+- 소스 URL과 원본 시작 및 끝을 작업 자료에 보존함. 출처 자막 삽입은 선택 후보이며 필수화하지 않음.
+- 실제 작업 취소는 Popen 프로세스를 종료함. 인코딩 취소 시 확보한 구간 원본을 보존하고 임시 결과만 정리함.
+- 확장 UI에서 내부 도구와 코덱을 전면 노출하지 않음. 로컬 연결 실패와 음성 누락은 다음 행동이 명확한 메시지로 안내함.
+- 실행파일 이름의 플랫폼 분기는 `binaries.py`, 경로는 pathlib를 사용함. 새 연결 계층에 플랫폼 분기가 필요하면 위치를 문서화함.
+- 설치를 사용자가 터미널에서 해결해야 하는 흐름으로 만들지 않음. 개발 세션의 에이전트가 첫 설치를 대행함.
+- 클라우드 처리, 계정, 자동 추천 중심 서비스로 범위를 바꾸지 않음. 모바일 목표는 유지하되 구현됐다고 표시하지 않음.
 
-아키텍처 문서 결론은 제약이 아니라 재심 가능한 상태로 물려받았고, 2026-09-03에 7건 전부를 단일 답으로 확정했다. **대상 플랫폼 확정: macOS 1순위 + Windows 병행(크로스플랫폼 유지).** 근거는 원 PC(Windows)와의 왕복 가능성이고, 비용은 `binaries.py`의 `sys.platform` 분기와 실행기 파일 2개뿐이다.
+## 6. 재심 및 실제 검증 항목
 
-| 전제 | Windows 결정 | 확정 판정 (2026-09-03) |
-|---|---|---|
-| 번들 바이너리 이름 | `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe` | **확정**: `binaries.py`가 `sys.platform`으로 분기. `win32`면 `.exe` 접미, 그 외(darwin/linux)는 확장자 없음. 이름 상수는 단일 지점에만 둔다 |
-| ffmpeg 번들 소스 | gyan.dev/BtbN 정적 빌드(Windows) | **확정**: 조달 우선순위를 1순위 정적 빌드 다운로드, 2순위 Homebrew 설치본 복사로 고정. 조달 스크립트가 `uname -m`으로 arm64/x86_64를 판별한다. 조달 결과(출처 URL, 버전, SHA256)는 `bin/`이 gitignore이므로 `docs/binaries-manifest.md`에 기록한다 |
-| 실행기 | `start.cmd` (더블클릭) | **확정**: `start.command`(macOS, `chmod +x` 필요)와 `start.cmd`(Windows) 두 파일을 모두 저장소 루트에 둔다. Gatekeeper 첫 실행은 우클릭 열기 1회 안내로 처리 |
-| 이벤트 루프 함정 | ProactorEventLoop 주의(Windows 전용) | **확정(변경 없음)**: macOS 해당 없음. `run_in_executor` + 동기 `subprocess.Popen` 실행 모델은 크로스플랫폼이므로 그대로 유지 |
-| 쿠키 폴백 | `--cookies-from-browser chrome` + App-Bound Encryption 회피 | **확정**: 폴백 순서를 (1) `--cookies FILE`(사용자가 내보낸 쿠키 파일), (2) `--cookies-from-browser`(macOS는 chrome, safari 순), (3) `player_client` 교체, (4) yt-dlp 업데이트 안내로 고정. Keychain 권한 프롬프트는 실측 대상으로 M1에 남긴다 |
-| 경로 처리 | 일부 역슬래시/`.exe` 하드코딩 | **확정**: 내부 경로는 전부 `pathlib.Path`. 문자열 결합 금지, subprocess 인자로 넘길 때만 `str()` 변환. `.exe` 하드코딩은 아키텍처 9절에서 제거 완료 |
-| v2 패키징 | PyInstaller onefile(Windows) | **확정(보류 유지)**: macOS `.app` 번들 + 코드서명/공증은 v2 범위. v1에서는 다루지 않는다 |
+Mac 바이너리와 변환, Chrome 구간 표시 및 연결, 구간 획득의 정확도와 전송량, 탭 녹화 음성, 설치와 종단 UX, 모바일 전체가 미검증임. 특히 녹화가 항상 더 가볍거나 구간 요청이 선택 길이만큼만 전송된다고 가정하지 않음.
 
-아키텍처 문서 15절의 기존 재심 항목(번들 ffmpeg 실제 버전에서 필터/컷/오디오 유지 통합 테스트, `player_client` 조합 변동, 포트 자동 선택 배선)은 여전히 실측 대상이며, 구현 계획(`docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md`)의 명시적 검증 태스크로 편입했다.
+참고 코드와 주의 사항:
 
-## 5. 관련 파일 인덱스
+- yt_clipper: YouTube 구간 표시, 크롭 좌표 및 드래그 복구.
+- Clipcillo: 원본 재사용, 편집 상태와 내보내기. yt-dlp 라이브러리 다운로드를 그대로 이식해 프로세스 취소 모델을 잃지 않음.
+- Chopify: 인코더 검사와 저해상도 초안. 추천 점수를 시청 성과로 읽지 않음.
+- Reframe: 설정 복원. 설정에 따라 외부 지표 전송이 있으므로 전체 복사보다 작은 함수 단위를 검토함.
+- Screenity: Chrome 녹화 흐름. 자체 코드 GPL-3.0이며 이번에는 이식하지 않음.
+- 한국어 자막은 일반 기능 도입 시의 참고임. 한국어 매칭 결함 발견을 제품 타깃의 근거로 사용하지 않음.
 
-- `README.md` : 프로젝트 개요, 로드맵
-- `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` : v1 구현 계획(읽기 1순위, 무엇을 어떤 순서로 만드는지)
-- `docs/superpowers/specs/2026-09-01-clipman-architecture.md` : 개발 아키텍처 확정본(읽기 2순위, **API 계약과 폴더 구조의 정본**)
-- `docs/superpowers/specs/2026-09-01-clipman-design.md` : 서비스/UI/UX 기획 정본(읽기 3순위, 제품 의도와 화면 흐름)
-- `docs/binaries-manifest.md` : 번들 실행파일 조달 기록(출처, 버전, SHA256). `bin/`이 gitignore이므로 이 파일이 유일한 추적 수단
-- `docs/cobalt-analysis.html` : 벤치마크 분석(참고)
-- `.gitignore` : `bin/`, `work/`, `output/`, `logs/`, venv, node_modules 제외
+## 7. 시작 명령
 
-## 6. 작업 원칙
-
-이 계정의 방법론(설계 먼저, 계획 합의 후 실행, TDD, 완료 전 검증, 서브에이전트 티어링, 적대적 검증, 한국어 출력 품질)은 글로벌 CLAUDE.md와 스킬이 강제하므로 여기 재서술하지 않는다. macOS 허브 세션은 그 규범을 이미 로드한다. 프로젝트 고유 원칙만 남긴다.
-
-- 개인 로컬 전용 도구다. 공개 서비스용 복잡성(터널 서명, 다층 인증, Redis)은 넣지 않는다.
-- 편집이 유일한 차별점이다. 다운로드는 검증된 도구(yt-dlp)에 위임하고 편집 UX에 투자한다.
-- v1은 최소(다운로드 + 자르기 + 세로 변환). blur_pad(흐린 배경)는 v1.1, 자막은 v2, 하이라이트는 v3.
-- 비개발자 사용자다. 설치와 실행은 Claude가 대행하고 사용자는 더블클릭만 한다.
-
-## 7. macOS 세션 시작 방법 (2026-10-10 갱신)
-
-M0와 M1 코드가 main에 있으므로 main에서 바로 시작한다.
+새 복제본이 필요할 때만 clone함.
 
 ```bash
 git clone git@github.com:blazethrottle/clipman.git
 cd clipman
-git pull origin main                                  # 이미 클론이 있다면 최신화만
+git status --short
+git remote -v
+git branch --show-current
+```
 
+기존 복제본은 미커밋과 스테이징 변경이 없는 경우만 갱신함.
+
+```bash
+git pull --ff-only origin main
 cd backend
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
-./.venv/bin/pytest                                    # 107 passed 확인 (바이너리 불필요)
+./.venv/bin/python -m pytest -q
+./.venv/bin/python -m pytest -m integration -q -rs
 ```
 
-1. 위 명령으로 저장소를 받고 단위 테스트 통과를 확인한다. 여기서 실패하면 환경 문제이므로 먼저 해결한다.
-2. 이 문서 -> 구현 계획서 -> architecture 순으로 읽는다(R1 선행자료 게이트). design spec은 제품 의도 확인용으로 필요할 때 읽는다.
-3. 개인 LLM Wiki(비공개)의 입구 페이지 `wiki/projects/clipman.md`를 읽는다(Mac: `python3 ~/llm-wiki-automation/ontology/wiki_query.py clipman`). 적용할 방법론 후보, 같은 부류 제품(slidecaptain)의 노하우, 이 Mac에서 확인된 셸·ffmpeg 함정이 정리되어 있다.
-4. **바이너리 조달이 첫 물리 작업이다.** 계획서 M1-0 절차대로 `bin/`에 `yt-dlp`, `ffmpeg`, `ffprobe`를 배치하고 `docs/binaries-manifest.md`에 출처와 버전, SHA256을 기록한다.
-5. `./.venv/bin/pytest -m integration`으로 M1-6을 실측한다. 세 모드의 오디오 유지 검증이 여기서 처음 실행된다. 통과 후 M2로 넘어간다.
+기존 가상환경이 있으면 먼저 확인하고 그대로 사용함. Windows는 `.venv/Scripts/python.exe`로 실행함. `bin/`이 없으면 통합 검사는 skip이 예상되며 성공 판정은 실제 passed 수와 출력 검사임.
+
+## 8. 다음 세션에 전달할 시작 요청
+
+> blazethrottle/clipman의 main에서 docs/HANDOFF.md와 2026-10-12 최신 승인 설계, 레퍼런스 조사부터 읽어줘. Chrome 확장 + 로컬 처리 프로그램 방향은 승인됐고 팬덤 특화와 전체 다운로드 선행은 철회됐어. YouTube를 보다가 구간을 표시하고 세로 구도를 조정해 쇼츠로 저장하는 간단하고 예쁜 경험을 구현해줘. 사용자 변경을 보존하고 기존 테스트 및 Mac 바이너리 상태를 확인한 뒤 새 연결 계약과 구현 계획을 갱신하고 핵심 UI와 첫 구간 획득 및 내보내기 연결부터 진행해줘. 모바일에서도 편집과 저장까지 완료하는 목표는 유지하되 아직 구현이 없음을 구분해줘. 승인된 방향을 다시 묻지 말고 중요한 범위 변경만 합의해줘.

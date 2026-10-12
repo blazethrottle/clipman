@@ -1,0 +1,30 @@
+확인일: 2026-10-12, Asia/Seoul
+기준 클립맨 SHA: 636341d8a3843313e50d46cff8ee8fac5cba46c0
+참고 코드 스냅샷과 기본 브랜치 커밋: 2026-10-12-reference-sources.json
+
+kakha13/youtube-shorts-generator, 48e780647f95e290f92694ea60cafc4bea0acd25
+명령: python -m pytest -q
+결과: 80 passed in 0.52s
+외부 네트워크와 실제 ffmpeg 출력은 검증하지 않음.
+
+추가 한국어 확인:
+from shortsgen.anchor import normalize, find_quote
+from shortsgen.models import Word
+words = [Word("안녕하세요", 0, 1), Word("오늘", 1, 2), Word("무대입니다", 2, 3)]
+normalize("안녕하세요") -> ""
+find_quote(words, "안녕하세요 오늘") -> None
+한국어가 ASCII 정규식에서 삭제되는 현재 코드의 동작을 재현함.
+
+mehbul/chopify, 99fa3e3d81be7ce35debf1e302a5c5da75f53f62
+명령: python -m pytest -q tests/test_chopify.py
+결과: 57 passed in 2.53s
+모킹과 순수 로직 검사임. 실제 다운로드, ffmpeg 출력과 팬덤 영상 추천 품질은 검증하지 않음.
+
+SysAdminDoc/Vertigo, a3d84ed733959496c4b4ec3f220565498fbd4156
+명령: python -m pytest -q tests/test_reframe_hardening.py tests/test_safe_zones.py tests/test_subtitles_filter_escape.py
+결과: 수집 중 2개 오류, ModuleNotFoundError: No module named 'cv2'
+추가 경고: Unknown config option: qt_api
+시험 환경에 OpenCV와 Qt 테스트 플러그인이 없음. 의존성 설치나 앱 실행은 수행하지 않았으며 앱 결함으로 판정하지 않음.
+
+환경: Windows, Python 3.13, pytest 9.1.1
+참고 저장소는 TEMP 디렉터리에 별도 clone함. 클립맨 코드와 참조 코드 수정 없음.

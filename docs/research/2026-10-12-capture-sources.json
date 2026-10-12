@@ -1,0 +1,41 @@
+{
+  "checked_date_kst": "2026-10-12",
+  "repositories": [
+    {
+      "repo": "alyssaxuu/screenity",
+      "sha": "dddeeb668ad285155a48fa89298f0fe2ef273579",
+      "license": "GPL-3.0",
+      "scope": "README, repository metadata, desktopCapture.js, startRecording.js; no runtime"
+    },
+    {
+      "repo": "wulkano/Kap",
+      "sha": "c42692fa63ac71ed192e01684beb78a1b864aa88",
+      "license": "MIT",
+      "scope": "README, repository metadata, editor controls play-bar.tsx; no runtime"
+    },
+    {
+      "repo": "wulkano/Aperture",
+      "sha": "7591bb540c844fe6c47edeac34b17c25e92a717f",
+      "license": "MIT",
+      "scope": "README and repository metadata only; no runtime"
+    }
+  ],
+  "official_documents": [
+    "https://github.com/yt-dlp/yt-dlp#download-options",
+    "https://github.com/yt-dlp/yt-dlp-wiki/blob/master/FAQ.md",
+    "https://developer.chrome.com/docs/extensions/reference/api/tabCapture",
+    "https://developer.chrome.com/docs/extensions/how-to/web-platform/screen-capture",
+    "https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging",
+    "https://developer.chrome.com/docs/extensions/reference/api/sidePanel",
+    "https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia",
+    "https://developers.google.com/youtube/iframe_api_reference",
+    "https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Share.html",
+    "https://developer.android.com/training/sharing/receive",
+    "https://developer.android.com/media/grow/media-projection",
+    "https://developer.android.com/media/platform/av-capture",
+    "https://developer.android.com/media/media3/transformer",
+    "https://developer.apple.com/documentation/avfoundation/avassetexportsession",
+    "https://developer.apple.com/documentation/replaykit"
+  ],
+  "runtime_verified": false
+}
