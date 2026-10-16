@@ -11,6 +11,16 @@ from app.jobs.manager import JobManager, JobStatus
 from app.wrappers import binaries, ffmpeg, ffprobe, ytdlp
 
 
+ERROR_MESSAGES = {
+    "BOT_BLOCK": "YouTube에서 가져오기를 제한했습니다. 다른 영상을 시도해 주세요.",
+    "FORMAT_UNAVAILABLE": "이 영상에서 요청한 화질을 가져올 수 없습니다.",
+    "NETWORK": "영상에 연결하지 못했습니다. 네트워크를 확인해 주세요.",
+    "HTTP_403": "YouTube가 영상 전송을 일시적으로 거부했습니다. 잠시 후 다시 시도해 주세요.",
+}
+# 일시적 거부만 다시 시도한다. 봇 차단과 화질 부재는 반복해도 결과가 같다.
+RETRYABLE = {"HTTP_403"}
+
+
 class Canceled(Exception):
     pass
 
@@ -51,9 +61,7 @@ class Engine:
         text = "".join(lines)
         if code:
             error_code = ytdlp.classify_error(text) if Path(args[0]).stem == "yt-dlp" else "PROCESS_FAILED"
-            message = {"BOT_BLOCK": "YouTube에서 가져오기를 제한했습니다. 다른 영상을 시도해 주세요.",
-                       "FORMAT_UNAVAILABLE": "이 영상에서 요청한 화질을 가져올 수 없습니다.",
-                       "NETWORK": "영상에 연결하지 못했습니다. 네트워크를 확인해 주세요."}.get(error_code,
+            message = ERROR_MESSAGES.get(error_code,
                        "이 구간을 처리할 수 없습니다. 영상이 재생 가능한지 확인하거나 다른 구간을 시도해 주세요.")
             raise ProcessingError(error_code, message)
         return text
@@ -76,7 +84,15 @@ class Engine:
         try:
             args = ytdlp.build_download_args(job.selection.url, job.quality, job.work_dir,
                 ffmpeg_dir=paths.BIN_DIR, exe=binaries.require(binaries.YTDLP), selection=job.selection)
-            self._run(job_id, generation, args, ytdlp.parse_progress_line)
+            try:
+                self._run(job_id, generation, args, ytdlp.parse_progress_line)
+            except ProcessingError as exc:
+                if exc.code not in RETRYABLE:
+                    raise
+                # 실패한 시도의 부분 파일이 남으면 확보 파일을 하나로 특정할 수 없다.
+                for partial in job.work_dir.glob("source.*"):
+                    partial.unlink(missing_ok=True)
+                self._run(job_id, generation, args, ytdlp.parse_progress_line)
             sources = [p for p in job.work_dir.glob("source.*") if p.suffix.lower() in {".mp4", ".mkv", ".webm", ".mov"}]
             if len(sources) != 1:
                 raise ProcessingError("DOWNLOAD_FAILED", "확보한 영상 파일을 확인할 수 없습니다.")

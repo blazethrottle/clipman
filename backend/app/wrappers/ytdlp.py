@@ -196,6 +196,9 @@ def classify_error(text: str) -> str:
         return "BOT_BLOCK"
     if "requested format" in lowered and "not available" in lowered:
         return "FORMAT_UNAVAILABLE"
+    # 구간 확보에서 ffmpeg가 받은 영상 서버 URL이 간헐적으로 거부된다(2026-10-16 macOS 실측 3회 중 1회).
+    if "403 forbidden" in lowered:
+        return "HTTP_403"
     if (
         any(
             token in lowered

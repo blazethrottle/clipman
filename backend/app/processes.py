@@ -7,6 +7,20 @@ import sys
 import time
 
 WINDOWS = os.name == "nt"
+MACOS_CA_BUNDLE = "/etc/ssl/cert.pem"
+
+
+def child_env(platform=None, environ=None, ca_bundle=MACOS_CA_BUNDLE):
+    """번들 실행파일에 넘길 환경 변수.
+
+    macOS 정적 ffmpeg의 OpenSSL은 빌드 기기의 인증서 경로를 보므로 시스템 인증서를 찾지 못한다.
+    --download-sections에서는 ffmpeg가 YouTube에 직접 HTTPS로 접속하므로 시스템 묶음을 지정한다.
+    """
+    env = dict(os.environ if environ is None else environ)
+    current = sys.platform if platform is None else platform
+    if current == "darwin" and "SSL_CERT_FILE" not in env and os.path.isfile(ca_bundle):
+        env["SSL_CERT_FILE"] = str(ca_bundle)
+    return env
 
 if WINDOWS:
     import ctypes
@@ -92,7 +106,7 @@ class OwnedProcess(subprocess.Popen):
                    *map(str, args)] if WINDOWS else args
         try:
             super().__init__(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             text=True, encoding="utf-8", errors="replace", **options)
+                             text=True, encoding="utf-8", errors="replace", env=child_env(), **options)
             if self._job:
                 self._job.assign(self)
                 self.stdin.write("1")
