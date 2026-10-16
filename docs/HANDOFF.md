@@ -163,4 +163,4 @@ python3 -m venv .venv
 
 ## 8. 다음 세션에 전달할 시작 요청
 
-> clipman 최종 QA를 진행해줘. Mac mini의 ~/Projects/clipman에서 docs/HANDOFF.md와 docs/verification/2026-10-16-macos-first-run.md를 먼저 읽고, 4절 「최종 QA 세션의 작업」 순서대로 확인해줘. 구현은 다시 만들지 말고, 결함은 재현 절차와 함께 기록한 뒤 회귀 검사를 먼저 추가해서 고쳐줘. 본인 Chrome 인수는 나와 함께 진행하고, 결과는 docs/verification에 QA 기록으로 남겨줘. 지금은 개인 용도이며 상업용 배포는 나중에 결정해.
+> clipman의 사용자 동반 인수를 진행해줘. Mac mini의 ~/Projects/clipman에서 docs/HANDOFF.md와 docs/verification/2026-10-16-final-qa.md를 먼저 읽어. 최종 QA는 2026-10-16에 끝났고 결함 1건(재실행 시 포트 유지)은 수정돼 있어. 남은 일은 ① 내 Chrome 프로필에서 사이드 패널 → 편집 → 저장을 반복하는 인수(4절 3항)와 ② 결정 2건(연령 제한 영상 안내 문구를 나눌지, ZIP 사본의 Gatekeeper 경고를 언제 확인할지)이야. 구현은 다시 만들지 말고, 결함이 나오면 재현 절차와 회귀 검사를 먼저 추가해서 고쳐줘. 지금은 개인 용도이며 상업용 배포는 나중에 결정해.
