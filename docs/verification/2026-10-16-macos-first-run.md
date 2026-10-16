@@ -7,7 +7,7 @@
 | 결함 | 재현 | 수정 | 회귀 검사 |
 |---|---|---|---|
 | 정적 ffmpeg가 시스템 인증서를 찾지 못함 | 실제 YouTube 3구간 모두 6~8초 만에 `DOWNLOAD_FAILED`. 원인 출력 `certificate verify failed` | `processes.child_env()`가 macOS에서 `SSL_CERT_FILE=/etc/ssl/cert.pem` 전달. 사용자가 지정한 값은 유지 | `tests/test_process_env.py` 6개(macOS 실물 1개 포함) |
-| YouTube 영상 서버의 간헐적 403 | 같은 구간을 앱 실행 경로로 3회 반복하면 1회 `HTTP error 403 Forbidden`, 2회 성공 | `classify_error`에 `HTTP_403` 분류 추가. 확보 단계에서 이 오류만 부분 파일을 지우고 1회 재시도. 재실패하면 "잠시 후 다시 시도" 안내 | `tests/test_engine_retry.py` 5개 |
+| YouTube 영상 서버의 간헐적 403 | 같은 구간을 앱 실행 경로로 3회 반복하면 1회 `HTTP error 403 Forbidden`, 2회 성공 | `classify_error`에 `HTTP_403` 분류 추가. 확보 단계에서 이 오류만 부분 파일을 지우고 1회 재시도. 재실패하면 "잠시 후 다시 시도" 안내 | `tests/test_engine_retry.py` 6개(실물 프로세스 경로 1개 포함, `e1a2146`) |
 
 ## Mac 프로세스 정리 실물 검사
 
@@ -22,7 +22,7 @@
 
 | 검사 | 결과 |
 |---|---|
-| pytest 전체(기본 + 실물 통합) | 223 passed, 2 skipped. skip 2개는 Windows Job Object 전용 검사 |
+| pytest 기본(`python -m pytest -q`, 통합 제외) | 211 passed, 2 skipped, 13 deselected. skip 2개는 Windows Job Object 전용 검사. 기준 `e1a2146` 이후 |
 | 실물 통합 검사만 | 13 passed |
 | pip check | 통과 |
 | Node 검사(`npm test`) | 5 passed |
@@ -45,14 +45,14 @@ aqz-KE-bpKQ 10~12초는 Windows 검수에서 90초 시간 초과였던 구간이
 
 ## 남은 미검증
 
-- `start.command` 더블클릭 실행과 본인 Chrome 프로필에서의 실제 사이드 패널 사용
+- `start.command` 실행과 본인 Chrome 프로필의 사이드 패널 사용은 아래 「사용자 첫 인수」에서 1회 확인함. 반복 사용은 미검증
 - 로그인이나 연령 제한이 있는 영상, 쿠키, 긴 구간, 실제 전송량 측정
 - 403 재시도 후에도 실패하는 빈도. 이번 표본은 반복 3회와 종단 5회다
 
-## 사용자 첫 인수 (2026-10-16 19:39)
+## 사용자 첫 인수 (2026-10-16 19:39, main `0d54bc1`)
 
-- `start.command`를 Finder 방식(`open`)으로 실행해 기동함. macOS 경고 창 없음(격리 속성 없음, provenance만 있음).
+- `start.command`를 Finder 방식(`open`)으로 실행해 기동함. macOS 경고 창 없음. 이 결과는 git clone으로 받은 체크아웃(격리 속성 `com.apple.quarantine` 없음, provenance만 있음) 기준이며, ZIP으로 내려받은 사본의 Gatekeeper 경고는 미검증임.
 - 사용자가 본인 Chrome 프로필에 `extension/dist`를 개발자 모드로 로드하고 연결 코드로 연결함.
 - 실제 YouTube 영상에서 구간 표시 → 편집 → 쇼츠 만들기 → MP4 저장까지 사용자가 직접 완료함.
-- 결과 `output/clipman-af0095dbe950-2.mp4`: 1080x1920 H.264/AAC, 7.53초, 평균 음량 -27.6dB. Chrome 다운로드 사본과 SHA256 일치.
-- 관측: 원본에 박힌 자막이 중앙 크롭에서 좌우가 잘림. 결함이 아니라 가로 원본의 중앙 크롭 특성이며, 구도 이동이나 PAD로 해결되는지는 QA에서 확인함.
+- 결과 `output/clipman-af0095dbe950-2.mp4`: 1080x1920 H.264/AAC, 7.53초(`ffprobe -show_streams`), 평균 음량 -27.6dB(`ffmpeg -af volumedetect`). SHA256 `91c908eeab15b3b3f73e514e713ed65d6d8914d326d74e728d338602e9b50fcd`, Chrome 다운로드 사본과 일치. 원본 선택은 `J4gD4p65cbc` 4.91~12.394초, 3840x2160, 좌우 위치 1690.
+- 관측: 원본에 박힌 자막이 「화면 채우기」(9:16 크롭)에서 좌우가 잘림. 결함이 아니라 가로 원본을 세로로 자를 때의 특성임. 좌우 위치와 「전체 화면 유지」로 해결되는지는 [최종 QA 기록](2026-10-16-final-qa.md)에서 실측함.

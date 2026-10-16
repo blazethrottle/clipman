@@ -1,11 +1,19 @@
 # clipman 개발 핸드오프
 
-- 갱신일: 2026-10-16, 서울 기준
+- 갱신일: 2026-10-16, 서울 기준 (최종 QA 반영)
 - 사용자 승인: 제품 목적과 초기 Chrome 확장 + 로컬 처리 프로그램 방향. 2026-10-12 후속 요청으로 로드맵 개발 착수
 - 2026-10-16 사용자 결정: 개인 용도로 먼저 쓰며 고도화하고, 상업용 배포 여부는 그 뒤에 정함. Mac 검증, PR 병합, 본인 Chrome 설치까지 진행하고 **최종 QA는 별도의 새 세션에서 진행함**
 - 저장소: `https://github.com/blazethrottle/clipman`, 기본 브랜치 `main`
 - 이번 개발 시작 기준: `54ae8c0` (당일 핸드오프 반영 main)
 - 이번 갱신은 Chrome MV3 확장, 처리 서비스/API 및 개인용 개발 릴리즈를 반영함. 일반 사용자 설치/스토어 게시의 완료는 아님
+
+## 2026-10-16 최종 QA (Mac mini, main `025b3a3` 기준)
+
+- 핸드오프 4절의 7개 항목을 수행함. 자동 검사 5종 통과, 실제 서버 API로 일반·4K 40초·세로 Shorts·연령 제한 영상과 확보/인코딩 취소, 재편집, 실행기 재실행을 확인함. 상세: [최종 QA 기록](verification/2026-10-16-final-qa.md), [비개발자용 QA 보고서](verification/2026-10-16-final-qa-report.html)
+- 결함 1건 수정: 사용 직후 `start.command`를 다시 열면 직전 연결의 TIME_WAIT 때문에 9000 bind가 실패해 임의 포트로 열리고 확장의 저장된 연결이 끊김. `open_listener()`가 POSIX에서 `SO_REUSEADDR`를 켬(Windows 제외). 회귀 검사 `test_listener_reclaims_port_left_in_time_wait`. 기본 pytest 212 passed·2 skipped.
+- 자막 실측: 자막이 박힌 가로 원본은 「화면 채우기」의 좌우 위치 어디에서도 자막이 잘리고, 「전체 화면 유지」만 보존함. 결함이 아니라 세로 크롭 폭의 한계임.
+- 사용자 반복 인수(사이드 패널 UI)는 사용자 부재로 수행하지 않음. 동반 세션에서 확인함.
+- 개선 후보(사용자 결정): 연령 제한 영상의 실패 메시지가 "가져오기를 제한했습니다. 다른 영상을 시도해 주세요."로 표시되어 로그인이 필요한 영상임을 알리지 않음. 문구 변경 여부는 사용자가 정함.
 
 ## 2026-10-16 macOS 실물 검증 (Mac mini, Apple Silicon)
 
@@ -80,7 +88,7 @@ UI는 가볍고 쾌적하며 단순하지만 깔끔하고 예뻐야 함. 시청 
 | M2 작업 관리자 | 기반 구현 완료 | jobs/manager.py, 상태/보존/취소/경합 검사 |
 | M3 서비스 및 M4 API | 초기 연결 구현 및 Windows 검사 완료 | services/engine.py, main.py 및 실물 흐름 검사 |
 | M5 Chrome 확장과 편집 UI | 개발 연결 구현 및 실제 MV3 시험 완료 | extension/, frontend/, 합성 페이지 브라우저 시나리오 |
-| 실행기와 개인용 ZIP | Windows 실행기, macOS `start.command` 기동 및 확장 패키지 검사 완료 | start.cmd, start.command, tools/package_extension.py. Finder 더블클릭과 일반 설치 미검증 |
+| 실행기와 개인용 ZIP | Windows 실행기, macOS `start.command` 기동·재실행 및 확장 패키지 검사 완료 | start.cmd, start.command, tools/package_extension.py. 2026-10-16 QA에서 재실행 시 포트 유지 결함을 수정함. ZIP 사본의 Gatekeeper 경고와 일반 설치는 미검증 |
 | 모바일 앱 | 미구현 | iOS 및 Android 구현 및 실기기 검증 없음 |
 
 기존 어댑터 코드는 PR #1로 **2026-10-11 08:37 서울 기준** main에 병합됨. 이번 착수 전 기본 테스트 107개 통과를 재확인함. 이번 결과는 위 착수 결과 및 검증 기록을 따름.
@@ -92,12 +100,12 @@ Mac mini의 `~/Projects/clipman`에는 `bin/`(macOS 실행파일 3종), `backend
 QA 세션은 구현을 다시 만들지 않고 아래를 확인함. 결함은 재현 절차와 함께 기록하고, 고칠 때는 회귀 검사를 먼저 추가함.
 
 1. **상태 확인:** PR #2·#3의 병합 여부, 현재 브랜치, 미커밋 변경을 확인함. 병합 전이면 `fix/media-contracts-pr2-20261012` 브랜치가 최신 코드임.
-2. **자동 검사 재현:** `backend`에서 pytest 전체, `frontend`에서 `npm test`, `npm run build`, `npx playwright test`. 기대값은 224 passed·2 skipped, 5, 통과, 1 passed임.
-3. **본인 Chrome 인수(사용자와 함께):** 2026-10-16 첫 인수에서 설치, 연결, 저장까지 1회 성공함([기록](verification/2026-10-16-macos-first-run.md)). QA에서는 반복 사용과 아래 항목을 확인함. 원본에 자막이 박힌 가로 영상은 중앙 크롭에서 자막 좌우가 잘리므로, 구도 이동이나 PAD로 해결되는지 확인함.
-   - 기존 항목: 사용자의 Chrome 프로필에서 실제 사이드 패널로 YouTube 시청 → 시작/끝 표시 → 이 구간 편집하기 → 구도 조절 → 쇼츠 만들기 → MP4 저장까지 진행함. 저장 파일을 재생해 장면, 음성, 구도를 확인함.
+2. **자동 검사 재현:** `backend`에서 기본 pytest(`python -m pytest -q`, 통합 제외)와 통합 pytest(`-m integration`)를 따로 실행함. `frontend`에서 `npm test`, `npm run build`, `npx playwright test`. 기대값은 기본 212 passed·2 skipped·13 deselected, 통합 13 passed, Node 5, 빌드 통과, Playwright 1 passed임(2026-10-16 QA 기준). Playwright 브라우저 캐시(`~/Library/Caches/ms-playwright`)가 없으면 `npx playwright install chromium`을 먼저 실행함.
+3. **본인 Chrome 인수(사용자와 함께):** 2026-10-16 첫 인수에서 설치, 연결, 저장까지 1회 성공함([기록](verification/2026-10-16-macos-first-run.md)). 2026-10-16 최종 QA는 사용자 부재로 기계 경로(API)만 검증했고, 사용자 반복 인수는 동반 세션에서 확인함. 원본에 자막이 박힌 가로 영상은 「화면 채우기」에서 자막 좌우가 잘림. QA 실측에서 자막 폭이 세로 크롭 폭보다 넓어 「좌우 위치」를 어디에 두어도 잘렸고 「전체 화면 유지」만 자막을 보존함([최종 QA 기록](verification/2026-10-16-final-qa.md)).
+   - 기존 항목: 사용자의 Chrome 프로필에서 실제 사이드 패널로 YouTube 시청 → 시작/끝 표시 → 이 구간 편집하기 → 세로 구도(화면 채우기·좌우 위치 또는 전체 화면 유지) → 쇼츠 만들기 → MP4 저장까지 진행함. 저장 파일을 재생해 장면, 음성, 구도를 확인함.
 4. **여러 영상:** 일반 영상, 고화질(4K) 영상, 세로 원본(Shorts), 연령 제한 또는 로그인 필요 영상, 긴 구간(30초 이상)을 각각 시도함. 확보 시간과 실패 메시지를 기록함. 구간 확보가 JavaScript runtime 관련 메시지로 실패하면, Finder 실행 환경의 PATH에 `/opt/homebrew/bin`(deno 위치)이 없는지 먼저 확인함. 2026-10-16 검사는 짧은 PATH에서 통과했으나 영상 2개의 표본임.
 5. **취소와 재편집:** 확보 중 취소, 인코딩 중 취소, 같은 구간 재편집 후 원본 보존을 확인함. 취소 뒤 `ps`로 yt-dlp·ffmpeg 잔여 프로세스가 없는지 확인함.
-6. **실행기:** Finder에서 `start.command`를 더블클릭함. 처음 실행 시 macOS 보안 경고가 나오는지, 연결 코드가 재실행 뒤에도 유지되는지 확인함.
+6. **실행기:** Finder에서 `start.command`를 더블클릭함. 연결 코드가 재실행 뒤에도 유지되는지는 2026-10-16 QA에서 확인함(TIME_WAIT 포트 결함 수정 뒤 9000 유지). ZIP으로 내려받은 사본은 격리 속성이 붙으므로 처음 실행 시 macOS 보안 경고가 나오는지 확인함. git clone 체크아웃은 경고가 없음을 확인함.
 7. **결과 기록:** `docs/verification/`에 QA 기록을 남기고 이 문서 3·4절을 갱신함.
 
 QA 이후의 개발 후보(개인 사용 단계): 일반 사용자용 설치/업데이트 정리, 탭 부분 녹화 비교, 모바일 발췌/편집/저장. 상업용 배포는 사용자가 개인 사용 뒤에 결정하며, 결정 전에 `docs/RELEASE.md`의 스토어 정책(다운로드 기능), ffmpeg 라이선스(GPL 빌드), YouTube 약관을 검토함.
@@ -117,7 +125,7 @@ QA 이후의 개발 후보(개인 사용 단계): 일반 사용자용 설치/업
 
 ## 6. 재심 및 실제 검증 항목
 
-실제 사용자 Chrome의 전체 UX, 제한 영상과 긴 구간, 전송량, 탭 녹화 음성, 일반 설치와 모바일 전체는 미검증임. Mac 바이너리와 변환, Windows 개발 연결과 YouTube 획득/변환은 위 최신 기록을 따름. 특히 녹화가 항상 더 가볍거나 구간 요청이 선택 길이만큼만 전송된다고 가정하지 않음.
+실제 사용자 Chrome의 반복 사용 UX, 로그인·쿠키가 필요한 영상, 전송량, 탭 녹화 음성, 일반 설치와 모바일 전체는 미검증임. 연령 제한 영상의 실패 메시지와 40초 구간은 2026-10-16 QA에서 확인함. Mac 바이너리와 변환, Windows 개발 연결과 YouTube 획득/변환은 위 최신 기록을 따름. 특히 녹화가 항상 더 가볍거나 구간 요청이 선택 길이만큼만 전송된다고 가정하지 않음.
 
 참고 코드와 주의 사항:
 
