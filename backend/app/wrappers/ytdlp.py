@@ -9,10 +9,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
-# yt-dlp가 stdout에 찍을 진행률 형식. 세 값 모두 없을 수 있어 파서가 방어한다.
+from app.capture import Selection, canonical_video_url
+
+# 첫 접두사는 출력 종류, 두 번째 접두사는 파서가 읽는 실제 출력이다.
 PROGRESS_TEMPLATE = (
-    "download:%(progress.downloaded_bytes)s"
+    "download:download:%(progress.downloaded_bytes)s"
     "/%(progress.total_bytes)s"
     "/%(progress.total_bytes_estimate)s"
 )
@@ -46,7 +49,19 @@ class VideoMeta:
 
 def build_metadata_args(url: str, exe: Path | str = "yt-dlp") -> list[str]:
     """-J는 JSON 덤프 1회로 제목, 길이, 썸네일, 화질 목록을 모두 준다. 다운로드는 하지 않는다."""
-    return [str(exe), "-J", "--no-warnings", str(url)]
+    _reject_playlist_url(url)
+    return [str(exe), "--ignore-config", "--no-playlist", "-J", "--no-warnings", str(url)]
+
+
+def _reject_playlist_url(url: str) -> None:
+    parsed = urlsplit(str(url))
+    host = (parsed.hostname or "").lower()
+    if host == "youtube.com" or host.endswith(".youtube.com"):
+        query = parse_qs(parsed.query)
+        if parsed.path.rstrip("/") == "/playlist" or (
+            parsed.path.rstrip("/") == "/watch" and "list" in query and not query.get("v")
+        ):
+            raise ValueError("재생목록 대신 발췌할 영상 하나의 주소를 사용하세요.")
 
 
 def qualities_from_formats(info: dict) -> list[str]:
@@ -83,7 +98,7 @@ def format_selector(quality: str | None) -> str:
     match = _QUALITY_PATTERN.match(str(quality))
     if not match:
         raise ValueError(f"알 수 없는 화질 값입니다: {quality!r}")
-    return f"bestvideo[height<={match.group(1)}]+bestaudio/best"
+    return f"bestvideo[height<={match.group(1)}]+bestaudio/best[height<={match.group(1)}]"
 
 
 def build_download_args(
@@ -95,10 +110,15 @@ def build_download_args(
     cookies_from_browser: str | None = None,
     player_client: str | None = None,
     exe: Path | str = "yt-dlp",
+    *,
+    selection: Selection | None = None,
 ) -> list[str]:
     """원본을 work/<job>/source.<ext>로 받는다. 원본 보존이 재편집의 전제다."""
+    _reject_playlist_url(url)
     args = [
         str(exe),
+        "--ignore-config",
+        "--no-playlist",
         "-f",
         format_selector(quality),
         "--merge-output-format",
@@ -122,6 +142,13 @@ def build_download_args(
     if player_client:
         args += ["--extractor-args", f"youtube:player_client={player_client}"]
 
+    if selection is not None:
+        url = canonical_video_url(selection.video_id, url)
+        args += [
+            "--download-sections",
+            f"*{selection.start_sec}-{selection.end_sec}",
+            "--force-keyframes-at-cuts",
+        ]
     args.append(str(url))
     return args
 
@@ -169,6 +196,9 @@ def classify_error(text: str) -> str:
         return "BOT_BLOCK"
     if "requested format" in lowered and "not available" in lowered:
         return "FORMAT_UNAVAILABLE"
+    # 구간 확보에서 ffmpeg가 받은 영상 서버 URL이 간헐적으로 거부된다(2026-10-16 macOS 실측 3회 중 1회).
+    if "403 forbidden" in lowered:
+        return "HTTP_403"
     if (
         any(
             token in lowered

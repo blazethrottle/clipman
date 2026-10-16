@@ -7,9 +7,37 @@
 
 | 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
 |---|---|---|---|---|---|---|
-| yt-dlp | 미조달 | | | | | |
-| ffmpeg | 미조달 | | | | | |
-| ffprobe | 미조달 | | | | | |
+| yt-dlp | 이 Windows 기기에 조달 | Windows / x64 | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe | `66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a` | 2026-10-12 |
+| ffmpeg | 이 Windows 기기에 조달 | Windows / x64 | 9.0.2 essentials | https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip | `3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec` | 2026-10-12 |
+| ffprobe | 이 Windows 기기에 조달 | Windows / x64 | 9.0.2 essentials | 위 ffmpeg archive와 동일 | `f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52` | 2026-10-12 |
+
+yt-dlp의 release `SHA2-256SUMS`와 실행파일 해시를 대조함. ffmpeg archive는 공급자 `.sha256`의 `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`와 대조 후 두 실행파일을 추출함. 공급자 체크섬 대조이며 별도 서명 검증은 수행하지 않음. 위 gyan URL은 가변 URL이므로 재조달 시 같은 파일인지 해시로 확인함.
+
+기존 변환 검사 5개를 이 기기의 실제 실행파일로 통과함. 통제된 로컬 HTTP 합성 영상으로 구간 가져오기 1개도 실행함. YouTube 네트워크 획득, 전송량, 브라우저 쿠키와 macOS 바이너리는 아직 미검증임. `bin/`은 gitignore이며 다른 기기로 자동 배포되지 않음.
+
+## 별도 검수 복제본의 8.x 검증
+
+아래 검수의 최신 검사와 실제 YouTube 성공/시간 초과는 [검증 기록](verification/2026-10-12-media-contract-review.md)을 따른다. 위 단락의 네트워크 미검증 표기는 초기 조달 시점 기록이다.
+
+| 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
+|---|---|---|---|---|---|---|
+| yt-dlp | Windows 검수 복제본 조달 | Windows x64 | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe | `66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a` | 2026-10-12 |
+| ffmpeg | Windows 검수 복제본 조달 | Windows x64 | 8.1.2 essentials | https://github.com/GyanD/codexffmpeg/releases/download/8.1.2/ffmpeg-8.1.2-essentials_build.zip | `1326dde4c84ff1f96fe6b8916c5bed29e163e9b5dccf995f6f3db069d143ec5e` | 2026-10-12 |
+| ffprobe | Windows 검수 복제본 조달 | Windows x64 | 8.1.2 essentials | 위와 같은 ffmpeg 배포 압축파일 | `b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07` | 2026-10-12 |
+
+## macOS (Mac mini, Apple Silicon)
+
+| 실행파일 | 조달 여부 | 플랫폼 / 아키텍처 | 버전 | 출처 URL | SHA256 | 조달일 |
+|---|---|---|---|---|---|---|
+| yt-dlp | 조달 | macOS arm64 (universal) | 2026.08.19 | https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos | `0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202` | 2026-10-16 |
+| ffmpeg | 조달 | macOS arm64 정적 빌드 | 9.0.2 (martin-riedl.de) | https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip | `2e11c6f90993cdb79fff84d3f90044d28316b310e75b3e030cfc9a54f2c9d384` | 2026-10-16 |
+| ffprobe | 조달 | macOS arm64 정적 빌드 | 9.0.2 (martin-riedl.de) | https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip | `2738aa46a7f9acbc8ab09a6715554c90f7de603171ac403726765685df6a0059` | 2026-10-16 |
+
+yt-dlp는 배포처 `SHA2-256SUMS`와 대조했다. ffmpeg와 ffprobe는 배포 ZIP을 배포처 `.sha256`(ffmpeg.zip `c8ed4c4e…d924`, ffprobe.zip `fcbe8395…97ea6`)과 대조한 뒤 추출했다. 위 표의 SHA256은 추출한 실행파일 값이다. `otool -L` 결과 ffmpeg는 macOS 시스템 프레임워크만 참조하므로 Homebrew 없이 동작한다.
+
+**macOS 정적 ffmpeg의 인증서 경로**: 이 빌드의 OpenSSL은 시스템 인증서를 찾지 못해, 구간 확보(`--download-sections`)에서 ffmpeg가 YouTube에 직접 접속할 때 `certificate verify failed`로 실패했다. `app/processes.py`의 `child_env()`가 macOS에서 `SSL_CERT_FILE=/etc/ssl/cert.pem`을 넘겨 해결한다. 다른 ffmpeg 빌드로 바꾸면 실제 YouTube 구간 확보를 다시 확인한다.
+
+Windows 검수 복제본: `C:/Users/DREAMUS/projects/clipman-review-20261012`. 다른 기기와 macOS의 조달 상태는 확인하지 않았다. 실행파일은 저장소에 포함하지 않는다. ffmpeg 배포 ZIP의 SHA256 `db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec`를 배포처 checksum과 대조했다. yt-dlp도 배포처 SHA2-256SUMS와 대조했다.
 
 ## 조달 절차
 

@@ -1,7 +1,10 @@
 # clipman v1 구현 계획 (Implementation Plan)
 
+M2 이후 실행 순서는 [2026-10-12 Chrome 발췌 흐름 계획](2026-10-12-clipman-capture-implementation-plan.md)으로 대체함. 아래는 M1 구현과 이전 계획의 이력임.
+
 - 작성일: 2026-09-03 (KST)
 - 상태: 9월 승인된 이전 구현 계획. **M1 어댑터 상태의 참고이며 M2 이후 순서는 2026-10-12 승인된 Chrome 확장 + 로컬 처리 방향으로 갱신해야 함.**
+- 2026-10-12 후속 실행 순서: [연결 및 취소 검수 계약](../specs/2026-10-12-clipman-engine-contract.md). 아래 M2~M5는 이전 구조의 참고이며 후속 실행 순서를 우선함.
 - 먼저 읽기: [최신 승인 설계](../specs/2026-10-12-clipman-capture-first-design.md)와 [핸드오프](../../HANDOFF.md). 승인된 제품 목적과 초기 형태를 다시 승인받지 않는다. 이 계획의 전체 다운로드 및 독립 웹앱 UI 순서를 변경 없이 실행하지 않는다.
 - 입력 문서: `docs/superpowers/specs/2026-09-01-clipman-architecture.md`(구현 정본), `docs/superpowers/specs/2026-09-01-clipman-design.md`(제품 의도), `docs/HANDOFF.md` 4절(플랫폼 판정)
 - 범위: v1 = 다운로드 + 구간 자르기 + 세로 9:16 변환(CROP/PAD) + 내보내기
@@ -83,7 +86,7 @@
 ## 3. M2: 작업 레지스트리
 
 - 대상: `jobs/manager.py`. `JobStatus` 7값, `JobState` 데이터클래스(아키텍처 5절 정의 그대로), 인메모리 딕셔너리 레지스트리.
-- 테스트: 상태 전이(QUEUED → DOWNLOADING → DOWNLOADED → ENCODING → DONE), 재편집 경로(DONE → ENCODING, 같은 `source_path` 재사용, `outputs` 누적), 취소(`_proc.terminate()` 호출 여부를 위조 객체로 검증), 실패 전이.
+- 테스트: 상태 전이(QUEUED → DOWNLOADING → DOWNLOADED → ENCODING → DONE), 재편집 경로(DONE → ENCODING, 같은 `source_path` 재사용, `outputs` 누적), 취소(실제 자식 프로세스 종료와 파일 쓰기 중단까지 검증), 실패 전이.
 - 정리 규칙 테스트: 다운로드 단계 취소는 job 폴더 통째 삭제, 인코딩 단계 취소는 `tmp/`만 삭제하고 원본 보존.
 - DoD: "한 번 받아 여러 번 편집"이 테스트로 고정됨. 이것이 clipman의 핵심 차별점이다.
 
@@ -92,7 +95,7 @@
 ## 4. M3: 유스케이스 계층
 
 - **M3-1 `services/download.py`**: 메타 조회, 다운로드 오케스트레이션, 봇 차단 폴백 4단계(쿠키 파일 → 브라우저 쿠키 → player_client → 업데이트 안내), NETWORK 지수 백오프.
-- **M3-2 `services/edit.py`**: ffprobe로 소스 확인 → 모드 자동 전환 판정 → 인코딩 → 종료코드 0이어도 출력 파일 부재나 0바이트면 실패 처리 → `output/`으로 원자적 이동(`os.replace`).
+- **M3-2 `services/edit.py`**: ffprobe로 소스 확인 → 모드 자동 전환 판정 → 인코딩 → 종료코드와 파일 크기 외에 ffprobe 영상 스트림, 유효 길이, 해상도와 음성 유지 검사로 성공을 판정 → `output/`으로 원자적 이동(`os.replace`).
 - **M3-3 쿠키 폴백 실측** (아키텍처 15절 재심 2번, 실사용 기기): macOS에서 `--cookies-from-browser`가 Keychain 프롬프트를 띄우는지, 브라우저 실행 중 실패하는지 1회 확인하고 결과를 아키텍처 7절에 기록.
 - **M3-4 `services/files.py`**: 결과 폴더 열기(macOS `open`, Windows `explorer`, Linux `xdg-open`), 경로 검증(작업 폴더 밖 접근 차단).
 - DoD: subprocess 모킹으로 각 폴백 분기가 실제로 갈라짐이 검증됨. 사용자 메시지가 전부 한국어.

@@ -9,6 +9,10 @@ backend/.venv/
 # Node / frontend build
 node_modules/
 frontend/dist/
+extension/dist/
+frontend/test-results/
+frontend/playwright-report/
+release/
 
 # clipman runtime (번들 바이너리와 산출물은 커밋하지 않음)
 bin/

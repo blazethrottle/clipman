@@ -1,0 +1,13 @@
+{
+  "name": "clipman-extension",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test ../extension/shared.test.js",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {"svelte": "5.57.2"},
+  "devDependencies": {"vite": "7.3.7", "@sveltejs/vite-plugin-svelte": "6.2.4", "@playwright/test": "1.64.0"}
+}

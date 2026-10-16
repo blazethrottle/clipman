@@ -2,9 +2,13 @@
 
 YouTube를 보다가 마음에 드는 영상의 특정 부분을 발췌하고 인용해 세로 9:16 쇼츠로 재편집하는 개인용 도구입니다. 시작과 끝을 표시하고 구도를 조정해 저장하는 단순하고 깔끔한 경험을 목표로 합니다.
 
-현재 상태: **2026-10-12 Chrome 확장 + 로컬 영상 처리 프로그램 방향 승인.** 영상 도구 어댑터 구현은 완료했고 확장, 작업 관리, 서비스, API와 편집 UI는 미구현입니다. 단위 테스트 107개 통과를 확인했으나 실물 통합 검사는 5개가 실행파일 부재로 skip되어 미완료입니다.
+현재 상태: **Chrome 확장 + 로컬 처리 프로그램의 개인용 개발 버전 0.2.0 구현.** 구간 표시, 확보, CROP/PAD 편집, MP4 저장과 재편집을 연결했습니다. Windows에서 기본 178개, 실물 통합 9개, 확장 검사 5개와 브라우저 시나리오 1개가 통과했습니다. 2026-10-16 macOS(Apple Silicon)에서 pytest 224개 통과(Windows 전용 2개 제외), 실제 YouTube 5구간 확보와 세로 MP4 저장, 실행기 기동을 확인했습니다. 개인 Chrome 인수(최종 QA), 일반 설치 프로그램과 모바일 검증은 남아 있습니다.
 
 새 세션은 [핸드오프](docs/HANDOFF.md)와 [최신 승인 설계](docs/superpowers/specs/2026-10-12-clipman-capture-first-design.md)를 먼저 읽습니다. 9월의 독립 로컬 웹앱 계획을 변경 없이 실행하지 않습니다.
+
+## 개인용으로 사용하기
+
+스토어 등록은 필수가 아닙니다. 이 PC에서는 `start.cmd`를 열고 Chrome 개발자 모드에서 `extension/dist`를 로드합니다. 최초 연결 코드를 복사해 패널에 붙여 넣은 뒤 사용합니다. 단계별 설치와 스토어 Private/Unlisted/Public 선택 조건은 [릴리즈 안내](docs/RELEASE.md)를 따릅니다.
 
 ## 개요
 
@@ -23,11 +27,15 @@ YouTube를 보다가 마음에 드는 영상의 특정 부분을 발췌하고 �
 
 ## 문서
 
+- 이번 개발과 릴리즈 기록: [2026-10-12 세션 기록](docs/SESSION-2026-10-12.md)
+
 - 최신 승인 설계: [2026-10-12 제품 및 초기 형태](docs/superpowers/specs/2026-10-12-clipman-capture-first-design.md)
 - 레퍼런스 조사: [공개 코드와 적용 조건](docs/research/2026-10-12-reference-review.md)
 - 영상 확보와 플랫폼 검토: [구간 확보 및 녹화](docs/research/2026-10-12-capture-options.md)
-- 9월 구현 계획: `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` (M1 참고, 후속 순서 갱신 필요)
-- 9월 아키텍처: `docs/superpowers/specs/2026-09-01-clipman-architecture.md` (로컬 엔진 참고, Chrome 연결 계약 갱신 필요)
+- 최신 연결 구현: [M3~M5와 개인 설치](docs/superpowers/plans/2026-10-12-chrome-first-connection.md)
+- 구현 계획: [Chrome 발췌 흐름](docs/superpowers/plans/2026-10-12-clipman-capture-implementation-plan.md)
+- 9월 구현 계획: `docs/superpowers/plans/2026-09-03-clipman-v1-implementation-plan.md` (M1 및 이전 계획 이력)
+- 아키텍처: `docs/superpowers/specs/2026-09-01-clipman-architecture.md` (1절에 Chrome 연결과 시각 계약 개정)
 - 9월 서비스 기획: `docs/superpowers/specs/2026-09-01-clipman-design.md` (최신 사용자 정정 우선)
 - 번들 실행파일 조달 기록: `docs/binaries-manifest.md`
 - 인수인계와 플랫폼 판정: `docs/HANDOFF.md`
@@ -45,6 +53,8 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ```
 
 Windows에서는 `.venv/Scripts/python.exe -m pytest`를 사용합니다. 통합 검사가 전부 skipped이면 실물 검증 완료가 아닙니다. 새 세션의 작업 및 검증 순서는 핸드오프를 따릅니다.
+
+확장 빌드는 `frontend`에서 `npm ci`와 `npm run build`로 만들며 `extension/dist`로 출력됩니다. `npm test`는 순수/메시지 보안 검사, `npm run test:browser`는 별도 Chromium 프로필과 합성 파일로 실제 확장을 검사합니다. 브라우저 검사를 처음 실행할 때는 에이전트가 Playwright Chromium을 준비합니다. `python tools/package_extension.py`는 빌드를 개인 설치용 ZIP으로 묶고 내용을 검증합니다.
 
 ## 라이선스
 

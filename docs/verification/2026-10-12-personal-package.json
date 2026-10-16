@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "artifact": "release/clipman-extension-0.2.0-personal.zip",
+  "files": 12,
+  "bytes": 31068,
+  "sha256": "87ae0e9c77d00b99d5ba920c3fc49bd96625acd432277509c471384eb25ae3ad",
+  "manifest_v3": true,
+  "extension_id": "mclhahjlopneichbpdcclfejapcklegc",
+  "bundled_backend": false,
+  "published_to_store": false,
+  "github_release_published": false,
+  "repository_artifact": "docs/artifacts/clipman-extension-0.2.0-personal.zip",
+  "runtime_unchanged_from_browser_test": true
+}

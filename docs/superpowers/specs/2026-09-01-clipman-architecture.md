@@ -1,7 +1,7 @@
 # clipman 개발 아키텍처 (Development Architecture)
 
 - 작성일: 2026-09-01 (KST), 적대적 리뷰(4개 렌즈) 반영 확정본
-- 상태: 2026-09-03 승인된 로컬 엔진 및 이전 API 설계. **2026-10-12 Chrome 확장 + 로컬 처리 방향 승인으로 입력, 연결, 구간 획득과 UI 계약 개정 대상임.**
+- 상태: 2026-09-03 로컬 엔진 설계에 **2026-10-12 Chrome 연결과 구간 시각 계약을 1절에 개정함.** 아래 이전 API와 SPA 설명은 개정 계약과 충돌하면 이력으로만 참조함.
 - 현재 우선순위: [2026-10-12 승인 설계](2026-10-12-clipman-capture-first-design.md)와 [핸드오프](../../HANDOFF.md)를 먼저 읽는다. 이 문서의 전체 다운로드 선행 및 독립 SPA 구조는 새 제품 형태를 덮어쓰지 않는다. 아직 새 API와 연결 계약이 구현됐다는 뜻은 아니다.
 - 정정 이력: 2026-09-03에 대상 플랫폼을 macOS 1순위 + Windows 병행(크로스플랫폼)으로 확정하고, Windows 전제로 남아 있던 서술(`.exe` 하드코딩, `start.cmd` 단독, 1절/3절 표현)을 정정했다. 판정 근거는 `docs/HANDOFF.md` 4절.
 - 상위 문서: `2026-09-01-clipman-design.md` (서비스/UI/UX/개념 아키텍처)
@@ -28,6 +28,23 @@
 ---
 
 ## 1. 시스템 개요
+
+### 2026-10-12 Chrome 흐름 개정 계약
+
+이 절은 아래의 이전 SPA 진입 및 전체 다운로드 요청 계약보다 우선함. 초기 연결은 `Chrome MV3 확장 -> 127.0.0.1 FastAPI -> 번들 실행파일`임. content script는 현재 영상 ID/URL과 시각을 읽고, 서비스 워커가 로컬 요청을 중계하며 패널은 선택과 상태, Svelte/Vite 편집 탭은 정밀 구도 조절을 담당함. 초기 API/확장 개발 연결은 구현됐으며 실제 사용자 Chrome의 인수는 남음.
+
+- 연결: loopback 전용, 단일 워커. 최초 연결에 실제 포트와 무작위 기기 연결 키를 사용함. 키는 gitignore logs/connection.key에 보존하고 URL/실행 로그/패키지에 넣지 않음. 서버는 Host, 허용된 확장 Origin 및 토큰/확장 ID 헤더를 검사함. 임의 웹 Origin, DNS rebinding과 토큰 없는 변경 요청을 거부함. 확장 storage.local은 TRUSTED_CONTEXTS 초기화 후 저장/조회하며 content script 접근을 거부함. Native Messaging은 첫 구현에 채택하지 않음.
+- `POST /api/jobs`: `{video_id, url, start_sec, end_sec, quality}`를 받는 선택 구간 확보 요청으로 개정함. 시작/끝은 YouTube 원본 시각이며 `0 <= start < end`, 모든 시각은 유한값이어야 함. URL의 영상 ID와 별도 ID가 다르면 거부함. URL을 검증하고 단일 watch URL로 정규화함.
+- `Selection`은 영상 식별 및 원본 선택을 보존함. `SourceTimeline(origin_start_sec, duration_sec)`은 확보 파일의 로컬 0초가 원본 몇 초인지와 실제 ffprobe 길이를 저장함. 예: 원본 120~135초, 파일 origin=120이면 로컬 2~5초 편집은 원본 122~125초임. 요청 시작을 실측값으로 오인하지 않음. 획득 서비스는 정밀 컷과 실제 장면 검증 후 origin을 등록함.
+- export의 `EditOptions.trim_start/trim_end`는 항상 확보 파일의 로컬 초임. `SourceTimeline.original_range`에서 음수, 역전, NaN, 무한대와 파일 길이 초과를 거부함. 원본 URL과 선택 범위 및 매핑은 작업 자료에 유지함.
+- 구간 명령은 기존 다운로드 인자에 `--no-playlist --download-sections '*START-END' --force-keyframes-at-cuts`를 추가함. 정밀 컷의 처리 비용과 전송량은 별도로 실측함. 전체 다운로드는 기존 어댑터 호출로만 남으며 API 기본 흐름에 넣지 않음.
+- M2 `JobManager`는 잠금으로 레지스트리를 보호하며 호출자에게 분리된 상태 사본을 반환함. 다운로드 및 인코딩 시작마다 `generation`을 증가시킴. 진행률/완료/오류/프로세스 등록은 해당 generation에만 적용함. 취소 뒤 늦은 콜백이 완료로 바꾸거나 과거 인코딩 콜백이 새 출력에 영향을 주면 안 됨.
+- 취소는 QUEUED/DOWNLOADING/ENCODING에서만 허용함. 다운로드 취소는 해당 job 폴더, 인코딩 취소는 해당 job의 tmp만 삭제함. 종료를 확인한 뒤 정리함. ERROR/CANCELED에 보존 원본이 있으면 재편집 가능함. 완성 출력은 삭제하지 않음. ERROR에 남은 다운로드 잔여 파일의 정리는 M3 서비스가 맡음.
+- Popen 소유권은 작업 관리자가 잠금 안에서 생성하고 등록한 프로세스에 한함. processes.py가 Windows Job Object와 POSIX 전용 세션 그룹 종료를 담당함. Windows는 대상 실행 전에 Job에 할당하고 부모 선행 종료 후에도 남은 자식을 종료함. 부모가 먼저 끝나도 POSIX 잔여 그룹에 KILL을 보냄. Windows 트리 종료는 실제 부모/자식으로 검사했고 POSIX 분기는 대역 검사만 완료함. 출력 검증 후 게시와 완료 등록은 같은 잠금 안에서 진행함.
+- 구현된 API는 GET /api/connect, POST /api/jobs, GET/DELETE /api/jobs/{id}, POST /api/jobs/{id}/export, GET/HEAD source 및 outputs/{index}임. 아래 이전 metadata, reveal 및 system/update-ytdlp는 아직 구현하지 않음. source/outputs는 정확한 경로별 HMAC 읽기 ticket으로 비디오 재생/Range/다운로드를 지원함. ticket은 변경 요청의 인증으로 쓰지 않음. 응답은 실제 로컬 파일 경로와 Popen을 노출하지 않음.
+- 소스 시각의 origin_basis는 requested_precise_cut임. 영상 길이는 ffprobe로 확인하되 요청 시작을 실제 장면 시작의 실측값으로 승격하지 않음. 일반 영상의 장면 시각과 품질은 후속 검증함.
+- 폴더: extension/에 MV3 manifest와 content/background/shared, frontend/src/에 Svelte 패널/편집, frontend 빌드 결과는 extension/dist/임. 전체 런타임 JS는 확장 패키지에 포함함. 빌드 및 개인 ZIP은 gitignore하며 재현 명령은 README에 있음.
+- 상세 순서와 이번 착수 범위는 [새 구현 계획](../plans/2026-10-12-clipman-capture-implementation-plan.md)을 따름.
 
 전부 사용자 PC 안에서 동작하는 로컬 3계층이다(macOS 1순위, Windows 병행). 브라우저는 화면만, 로컬 파이썬 서버가 번들 실행파일을 호출해 무거운 처리를 한다.
 
@@ -213,16 +230,18 @@ QUEUED --start--> DOWNLOADING --(성공)--> DOWNLOADED --(편집 제출)--> ENCO
 
 ## 6. 작업 수명주기, 진행률, 취소, 정리
 
+2026-10-12 검수 정정: 아래 부모 Popen 종료만으로 취소를 보장한다는 설명은 폐기한다. [연결 및 취소 계약](2026-10-12-clipman-engine-contract.md)의 프로세스 트리 종료, 종료 대기, 정리 순서를 적용한다.
+
 - **진행률: 폴링.** `GET /api/jobs/{id}`를 500ms~1s 간격. 단일 사용자 로컬 앱에 가장 단순하고 견고하다. progress는 status별로 0~1(UI에 "다운로드 40%", "인코딩 70%").
-- **취소(정정).** JobState의 `_proc`(Popen)를 `terminate()` 후 응답 없으면 `kill()` 한다. yt-dlp도 ffmpeg도 실행파일이라 프로세스 핸들이 있으므로 다운로드/인코딩 모두 실제로 멈춘다(라이브러리였다면 다운로드 취소가 불가능했다).
+- **취소(정정).** 작업이 소유한 프로세스 트리 전체를 종료하고 종료를 기다린다. macOS 프로세스 그룹과 Windows Job Object의 세부 계약은 연결 및 취소 계약을 따른다. 부모 Popen 종료만으로 실제 취소를 보장하지 않는다.
 - **정리(정정).** 폴더 구조를 둘로 나눈다. 다운로드 원본은 `work/<job_id>/source.*`에 **보존**하고, 인코딩 중간물만 `work/<job_id>/tmp/`에 두어 export마다 정리한다. 취소/실패 시 삭제 범위: 다운로드 단계 취소면 그 job 폴더 통째로, 인코딩 단계 취소면 `tmp/`와 미완성 출력만(원본은 보존해 재편집이 재다운로드를 강제하지 않게). 완성된 쇼츠는 `output/`로 원자적 이동(`os.replace`). Windows에서 핸들 잔류로 삭제가 실패할 수 있으므로 `rmtree(ignore_errors=True)` + 시작 시 오래된 job 폴더 스윕을 병행한다.
 
 ---
 
 ## 7. 다운로드 설계 (yt-dlp subprocess)
 
-- **미리보기:** `yt-dlp -J --no-warnings <url>`로 JSON을 받아 title, duration, thumbnail, formats를 파싱한다. formats에서 height별로 정리한 `qualities[]`를 `/api/metadata`가 반환해 UI가 실제 화질 목록을 준다.
-- **다운로드:** `yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" --merge-output-format mp4 --ffmpeg-location <bin> -o "<work>/source.%(ext)s" --newline --progress-template "download:%(progress.downloaded_bytes)s/%(progress.total_bytes)s/%(progress.total_bytes_estimate)s" <url>`. stdout을 줄 단위로 읽어 진행률을 계산한다(total_bytes 부재 시 estimate로 폴백).
+- **미리보기:** `yt-dlp --ignore-config --no-playlist -J --no-warnings <url>`로 JSON을 받아 title, duration, thumbnail, formats를 파싱한다. formats에서 height별로 정리한 `qualities[]`를 `/api/metadata`가 반환해 UI가 실제 화질 목록을 준다.
+- **다운로드:** `yt-dlp --ignore-config --no-playlist -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" --merge-output-format mp4 --ffmpeg-location <bin> -o "<work>/source.%(ext)s" --newline --progress-template "download:download:%(progress.downloaded_bytes)s/%(progress.total_bytes)s/%(progress.total_bytes_estimate)s" <url>`. stdout을 줄 단위로 읽어 진행률을 계산한다(total_bytes 부재 시 estimate로 폴백).
 - **취소:** Popen 핸들 terminate.
 - **봇 차단 폴백(로컬 강점, 순서 확정 2026-09-03):** stdout/stderr에 `Sign in to confirm you're not a bot`가 뜨면 순서대로 재시도한다. (1) `--cookies FILE`(사용자가 내보낸 쿠키 파일이 있을 때) (2) `--cookies-from-browser`(macOS는 `chrome` 다음 `safari`, Windows는 `chrome`) (3) `--extractor-args "youtube:player_client=..."` 교체 (4) yt-dlp 업데이트 안내.
 - **업데이트:** `POST /api/system/update-ytdlp`가 `yt-dlp -U`를 실행한다. 실행파일 자체 갱신이라 파이썬 재시작이 필요 없다(라이브러리 방식 대비 이점).
@@ -232,6 +251,8 @@ QUEUED --start--> DOWNLOADING --(성공)--> DOWNLOADED --(편집 제출)--> ENCO
 ---
 
 ## 8. 편집 설계 (ffmpeg)
+
+2026-10-12 검수 정정: 인코딩 전 유한한 원본 길이와 `0 <= trim_start < trim_end <= duration`을 검사한다. 결과는 종료코드와 크기뿐 아니라 ffprobe의 유효한 영상 스트림, 길이, 해상도와 원본 음성 유지까지 검사해야 한다. 재생목록 전용 URL은 거부하고 시청 URL에 list가 있어도 해당 영상 하나만 처리한다. yt-dlp 진행률의 첫 `download:`는 출력 종류이며 두 번째가 실제 출력 접두사다.
 
 구간 컷은 재인코딩 경로로 통일한다(세로 변환이 이미 재인코딩을 요구). 명령은 `-ss START -i input -t DURATION`로 고정해 빠른 시크와 프레임 정확성을 함께 얻고, `-to` 대신 `-t`로 버전별 타임라인 혼선을 차단한다.
 
@@ -305,14 +326,14 @@ def binary_path(name: str) -> Path:                       # name: "ffmpeg" | "ff
 | `timed out`, `Connection`, `5xx` | NETWORK | 지수 백오프 재시도 | 네트워크 문제로 재시도합니다. |
 | 그 외 실패 | DOWNLOAD_FAILED | 없음(즉시 실패) | 다운로드 실패. (stderr 마지막 N줄 접힌 상세) |
 
-편집(ffmpeg): 성공/실패는 종료코드로만(0=성공, 그 외 실패), 종류는 stderr 패턴으로. `-hide_banner -loglevel error`로 오류 라인만 남긴다. v1은 크롭 범위 초과만 별도 처리(사용자가 고칠 수 있으므로), 나머지는 generic.
+편집(ffmpeg): 종료코드가 0이고 출력의 영상 스트림, 유효한 길이, 해상도와 필요한 음성 유지 검사를 통과한 경우에만 성공이다. 실패 종류는 stderr와 출력 검사 결과로 판정한다. `-hide_banner -loglevel error`로 오류 라인만 남긴다. v1은 크롭 범위 초과만 별도 처리(사용자가 고칠 수 있으므로), 나머지는 generic.
 
 | stderr 패턴 | error_code | 사용자 메시지 |
 |---|---|---|
 | `Invalid too big or non positive size` | CROP_OUT_OF_RANGE | 자를 영역이 영상 크기를 벗어났습니다. 크롭을 줄이세요. |
 | 그 외 실패 | ENCODE_FAILED | 편집 실패. (stderr 마지막 N줄 접힌 상세) |
 
-추가 판정: 종료코드 0이어도 출력 파일이 없거나 크기 0이면 실패로 본다(항상 재검증).
+추가 판정: 존재하고 크기가 양수인 파일도 빈 MP4 헤더일 수 있다. ffprobe 출력 검증은 필수이며 실패 시 최종 경로로 옮기지 않는다.
 
 ---
 
