@@ -1,3 +1,8 @@
+import os
+import sys
+
+import pytest
+
 from app.capture import Selection
 from app.jobs.manager import JobManager, JobStatus
 from app.services import engine as engine_module
@@ -55,6 +60,31 @@ def test_other_errors_are_not_retried(tmp_path):
     job = _acquire(engine)
     assert len(calls) == 1
     assert job.status == JobStatus.ERROR
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='셔뱅 실행 스크립트를 쓰는 POSIX 실물 검사')
+def test_retry_runs_a_second_real_process_in_the_same_generation(tmp_path, monkeypatch):
+    marker = tmp_path / 'first-run-done'
+    fake = tmp_path / 'yt-dlp'
+    fake.write_text(
+        f'#!{sys.executable}\n'
+        'import sys, pathlib\n'
+        f'marker = pathlib.Path({str(marker)!r})\n'
+        'out = pathlib.Path(sys.argv[sys.argv.index("-o") + 1].replace("%(ext)s", "mp4"))\n'
+        'if not marker.exists():\n'
+        '    marker.touch()\n'
+        '    out.with_name("source.f401.mp4.part").write_bytes(b"partial")\n'
+        '    print("[https @ 0x1] HTTP error 403 Forbidden", flush=True)\n'
+        '    sys.exit(8)\n'
+        'out.write_bytes(b"video")\n')
+    fake.chmod(0o755)
+    monkeypatch.setattr(engine_module.binaries, 'require', lambda name, *a, **k: fake)
+    engine = Engine(JobManager(tmp_path / 'work'), tmp_path / 'output')
+    engine._probe = lambda job_id, generation, source: SourceMeta(1920, 1080, 2.0, True)
+    job = _acquire(engine)
+    assert marker.exists()
+    assert job.status == JobStatus.DOWNLOADED, f'{job.error_code}: {job.message}'
+    assert sorted(p.name for p in job.work_dir.iterdir()) == ['source.mp4']
 
 
 def test_classify_googlevideo_403():
