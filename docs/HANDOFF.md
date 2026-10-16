@@ -1,10 +1,20 @@
 # clipman 개발 핸드오프
 
-- 갱신일: 2026-10-12, 서울 기준
+- 갱신일: 2026-10-16, 서울 기준
 - 사용자 승인: 제품 목적과 초기 Chrome 확장 + 로컬 처리 프로그램 방향. 2026-10-12 후속 요청으로 로드맵 개발 착수
+- 2026-10-16 사용자 결정: 개인 용도로 먼저 쓰며 고도화하고, 상업용 배포 여부는 그 뒤에 정함. Mac 검증, PR 병합, 본인 Chrome 설치까지 진행하고 **최종 QA는 별도의 새 세션에서 진행함**
 - 저장소: `https://github.com/blazethrottle/clipman`, 기본 브랜치 `main`
 - 이번 개발 시작 기준: `54ae8c0` (당일 핸드오프 반영 main)
 - 이번 갱신은 Chrome MV3 확장, 처리 서비스/API 및 개인용 개발 릴리즈를 반영함. 일반 사용자 설치/스토어 게시의 완료는 아님
+
+## 2026-10-16 macOS 실물 검증 (Mac mini, Apple Silicon)
+
+- Mac용 yt-dlp 2026.08.19와 ffmpeg/ffprobe 9.0.2 정적 빌드를 조달하고 배포처 해시와 대조함. [manifest](binaries-manifest.md)의 macOS 표에 기록함.
+- Mac에서 결함 2건을 발견해 수정함. ① 정적 ffmpeg가 시스템 인증서를 찾지 못해 실제 YouTube 구간 확보가 전부 실패함. `processes.child_env()`가 `SSL_CERT_FILE`을 전달함. ② YouTube 영상 서버의 간헐적 403(반복 3회 중 1회). 확보 단계에서 1회 재시도함.
+- POSIX 프로세스 트리 취소를 실제 자식 프로세스로 검사하는 `test_posix_process_tree.py`를 추가함. 결함 주입 시 실패함을 확인함.
+- pytest 224 passed, 2 skipped(Windows 전용), Node 5, 확장 빌드, Playwright MV3 1 통과. 실제 YouTube 5구간을 짧은 PATH 환경에서 1080x1920 MP4로 저장함.
+- `start.command`를 Finder와 같은 짧은 환경으로 실행해 127.0.0.1:9000 연결 안내 페이지와 `logs/connection.key`(권한 600) 생성을 확인함.
+- 상세: [macOS 검증 기록](verification/2026-10-16-macos-first-run.md)
 
 ## 검수 후속 보완 (별도 수정 브랜치)
 
@@ -64,28 +74,32 @@ UI는 가볍고 쾌적하며 단순하지만 깔끔하고 예뻐야 함. 시청 
 | M1-3 메타 정보 파싱 | 구현 완료 | `wrappers/ffprobe.py`, 회전 및 음성 유무 |
 | M1-4 트림과 CROP/PAD 명령 | 구현 완료 | `wrappers/ffmpeg.py`, 진행률 파싱 |
 | M1-5 다운로드 명령과 오류 파싱 | 구현 완료 | `wrappers/ytdlp.py` |
-| M1-0 바이너리 조달 | Windows 완료, Mac 미확인 | manifest의 버전/체크섬 기록 |
-| M1-6 실제 변환 검증 | Windows 완료 | 기존 인코딩 검사 5개 실제 통과 |
+| M1-0 바이너리 조달 | Windows, macOS arm64 완료 | manifest의 버전/체크섬 기록 |
+| M1-6 실제 변환 검증 | Windows, macOS 완료 | 실물 통합 13개 통과, 실제 YouTube 5구간(macOS) |
 | 구간 자료형 및 명령 | 구현 및 합성 HTTP 검사 완료 | capture.py와 test_section_integration.py |
 | M2 작업 관리자 | 기반 구현 완료 | jobs/manager.py, 상태/보존/취소/경합 검사 |
 | M3 서비스 및 M4 API | 초기 연결 구현 및 Windows 검사 완료 | services/engine.py, main.py 및 실물 흐름 검사 |
 | M5 Chrome 확장과 편집 UI | 개발 연결 구현 및 실제 MV3 시험 완료 | extension/, frontend/, 합성 페이지 브라우저 시나리오 |
-| 실행기와 개인용 ZIP | Windows 실행기 및 확장 패키지 검사 완료 | start.cmd, start.command, tools/package_extension.py. Mac/일반 설치 미검증 |
+| 실행기와 개인용 ZIP | Windows 실행기, macOS `start.command` 기동 및 확장 패키지 검사 완료 | start.cmd, start.command, tools/package_extension.py. Finder 더블클릭과 일반 설치 미검증 |
 | 모바일 앱 | 미구현 | iOS 및 Android 구현 및 실기기 검증 없음 |
 
 기존 어댑터 코드는 PR #1로 **2026-10-11 08:37 서울 기준** main에 병합됨. 이번 착수 전 기본 테스트 107개 통과를 재확인함. 이번 결과는 위 착수 결과 및 검증 기록을 따름.
 
-사용 Mac의 미푸시 변경과 로컬 `bin/`은 확인하지 못함. 다음 세션이 기기의 실제 상태와 manifest를 대조하고 이미 조달한 바이너리를 무조건 다시 받지 않음.
+Mac mini의 `~/Projects/clipman`에는 `bin/`(macOS 실행파일 3종), `backend/.venv`, `frontend/node_modules`와 빌드된 `extension/dist`가 준비돼 있음. 다시 조달하거나 설치하지 않음.
 
-## 4. 다음 개발과 인수 관문
+## 4. 최종 QA 세션의 작업 (2026-10-16 기준)
 
-1. 저장소 및 Draft PR의 실제 상태, 미커밋 변경과 현재 기기의 bin을 확인함. 이번 작업을 다시 구현하지 않음.
-2. 기본 178개, 실물 통합 9개, Node 5개 및 브라우저 1개 검사를 참고함. 현재 기기에서 실행파일이 없으면 실물 검사는 skip될 수 있음.
-3. 사용자의 실제 Chrome 프로필에서 개인용 확장을 로드하고 실제 YouTube 페이지, 사이드 패널과 편집 탭의 전체 흐름을 인수함. 자동 검사는 Chromium에 실제 확장을 설치했지만 YouTube 모양의 합성 페이지를 사용하며 패널 페이지를 확장 탭으로 검사함.
-4. 여러 영상의 실제 장면 및 시각, 화질, 제한/로그인/쿠키와 JavaScript 런타임 조건, 전송량과 대기를 검사함. 단일 320x240 영상 성공을 일반 품질 근거로 확대하지 않음.
-5. macOS 바이너리와 실행기, POSIX 프로세스 트리 종료를 실제 기기에서 확인함. 기존 Mac 파일을 보존함.
-6. 일반 사용자용 로컬 프로그램 설치/업데이트를 정리함. 스토어를 선택하면 docs/RELEASE.md의 정책, 등록, 시험 안내와 확장 ID 변경 관문을 닫은 후 별도로 제출함.
-7. 탭 부분 녹화와 모바일 발췌/편집/저장 검증은 후속 계획으로 유지함. 자막/자동 추천을 먼저 확대하지 않음.
+QA 세션은 구현을 다시 만들지 않고 아래를 확인함. 결함은 재현 절차와 함께 기록하고, 고칠 때는 회귀 검사를 먼저 추가함.
+
+1. **상태 확인:** PR #2·#3의 병합 여부, 현재 브랜치, 미커밋 변경을 확인함. 병합 전이면 `fix/media-contracts-pr2-20261012` 브랜치가 최신 코드임.
+2. **자동 검사 재현:** `backend`에서 pytest 전체, `frontend`에서 `npm test`, `npm run build`, `npx playwright test`. 기대값은 224 passed·2 skipped, 5, 통과, 1 passed임.
+3. **본인 Chrome 인수(사용자와 함께):** 사용자의 Chrome 프로필에서 실제 사이드 패널로 YouTube 시청 → 시작/끝 표시 → 이 구간 편집하기 → 구도 조절 → 쇼츠 만들기 → MP4 저장까지 진행함. 저장 파일을 재생해 장면, 음성, 구도를 확인함.
+4. **여러 영상:** 일반 영상, 고화질(4K) 영상, 세로 원본(Shorts), 연령 제한 또는 로그인 필요 영상, 긴 구간(30초 이상)을 각각 시도함. 확보 시간과 실패 메시지를 기록함.
+5. **취소와 재편집:** 확보 중 취소, 인코딩 중 취소, 같은 구간 재편집 후 원본 보존을 확인함. 취소 뒤 `ps`로 yt-dlp·ffmpeg 잔여 프로세스가 없는지 확인함.
+6. **실행기:** Finder에서 `start.command`를 더블클릭함. 처음 실행 시 macOS 보안 경고가 나오는지, 연결 코드가 재실행 뒤에도 유지되는지 확인함.
+7. **결과 기록:** `docs/verification/`에 QA 기록을 남기고 이 문서 3·4절을 갱신함.
+
+QA 이후의 개발 후보(개인 사용 단계): 일반 사용자용 설치/업데이트 정리, 탭 부분 녹화 비교, 모바일 발췌/편집/저장. 상업용 배포는 사용자가 개인 사용 뒤에 결정하며, 결정 전에 `docs/RELEASE.md`의 스토어 정책(다운로드 기능), ffmpeg 라이선스(GPL 빌드), YouTube 약관을 검토함.
 
 ## 5. 구현할 때 보존할 계약
 
@@ -102,7 +116,7 @@ UI는 가볍고 쾌적하며 단순하지만 깔끔하고 예뻐야 함. 시청 
 
 ## 6. 재심 및 실제 검증 항목
 
-Mac 바이너리와 변환, 실제 사용자 Chrome의 전체 UX, 여러 영상의 장면 시각과 전송량, 탭 녹화 음성, 일반 설치와 모바일 전체는 미검증임. Windows 개발 연결과 단일 YouTube 획득/변환은 위 최신 기록을 따름. 특히 녹화가 항상 더 가볍거나 구간 요청이 선택 길이만큼만 전송된다고 가정하지 않음.
+실제 사용자 Chrome의 전체 UX, 제한 영상과 긴 구간, 전송량, 탭 녹화 음성, 일반 설치와 모바일 전체는 미검증임. Mac 바이너리와 변환, Windows 개발 연결과 YouTube 획득/변환은 위 최신 기록을 따름. 특히 녹화가 항상 더 가볍거나 구간 요청이 선택 길이만큼만 전송된다고 가정하지 않음.
 
 참고 코드와 주의 사항:
 
@@ -140,4 +154,4 @@ python3 -m venv .venv
 
 ## 8. 다음 세션에 전달할 시작 요청
 
-> blazethrottle/clipman의 Draft PR #2와 codex/capture-foundation-20261012 브랜치부터 확인하고 docs/HANDOFF.md, docs/RELEASE.md와 docs/SESSION-2026-10-12.md를 읽어줘. Chrome MV3 확장, 로컬 처리 서비스/API, 구간 편집과 MP4 저장의 개발 연결은 구현돼 있으니 다시 만들지 마. 기본 178개, 실물 9개, Node 5개와 브라우저 1개 검증 및 실제 YouTube 단일 영상 확보/변환 기록을 먼저 확인해줘. 다음 단계는 본인 Chrome의 실제 사이드 패널과 YouTube 시청부터 저장까지 인수, 여러 영상의 장면 시각/품질/제한 조건, Mac 실기기 및 일반 로컬 설치/업데이트 검증이야. 개인용 ZIP은 docs/artifacts에 기록돼 있고 스토어 없이 본인만 쓰는 방식이 현재 추천이지만 최종 릴리즈 방식 확정과 스토어 심사/게시는 아직 하지 않았어. 사용자 변경을 보존하고 실제 기기와 바이너리 상태를 대조해줘. 모바일의 발췌/편집/저장 목표는 유지하고 중요한 범위 변경만 합의해줘.
+> clipman 최종 QA를 진행해줘. Mac mini의 ~/Projects/clipman에서 docs/HANDOFF.md와 docs/verification/2026-10-16-macos-first-run.md를 먼저 읽고, 4절 「최종 QA 세션의 작업」 순서대로 확인해줘. 구현은 다시 만들지 말고, 결함은 재현 절차와 함께 기록한 뒤 회귀 검사를 먼저 추가해서 고쳐줘. 본인 Chrome 인수는 나와 함께 진행하고, 결과는 docs/verification에 QA 기록으로 남겨줘. 지금은 개인 용도이며 상업용 배포는 나중에 결정해.

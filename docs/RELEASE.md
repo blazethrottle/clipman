@@ -25,6 +25,17 @@ Windows와 macOS에서 임의 CRX 파일이나 자체 서버를 이용한 일반
 
 업데이트 시 기존 빌드 폴더 위치와 manifest의 공개 key를 유지하고 확장 관리의 새로고침 버튼을 누름. 코드가 바뀐 YouTube 탭도 새로고침함. 같은 포트에서 다시 실행하면 기기 연결 키를 보존하므로 기존 연결을 유지함. 포트 또는 키가 달라진 경우 연결 코드를 다시 복사함. 로컬 폴더를 삭제하거나 옮기면 설치 경로를 다시 지정해야 함. [공식 개인용 로드 및 새로고침 절차](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked)
 
+## Mac에서 처음 사용하기 (Mac mini, 2026-10-16 준비)
+
+Mac mini의 `~/Projects/clipman`에 macOS 실행파일, 처리 환경과 빌드된 확장이 준비돼 있음.
+
+1. Finder에서 `~/Projects/clipman/start.command`를 더블클릭함. 연결 안내 페이지가 Chrome에서 열림. 처음 실행할 때 macOS가 확인 창을 띄우면 **열기**를 선택함.
+2. Chrome 주소창에 `chrome://extensions`를 입력하고 오른쪽 위 **개발자 모드**를 켬.
+3. **압축해제된 확장 프로그램을 로드합니다**를 누르고 `~/Projects/clipman/extension/dist` 폴더를 선택함. 파일 선택 창에서 `Cmd+Shift+G`를 누르면 경로를 직접 입력할 수 있음.
+4. 퍼즐 메뉴에서 clipman을 도구 모음에 고정하고, 열려 있던 YouTube 탭을 새로고침함.
+5. clipman 아이콘을 눌러 패널을 열고, 연결 안내 페이지의 **연결 코드 복사**로 얻은 코드를 붙여 넣음.
+6. 영상에서 시작과 끝을 표시한 뒤 **이 구간 편집하기**, 구도 조절과 **쇼츠 만들기**, **MP4 저장** 순서로 사용함.
+
 ## 설치용 ZIP의 의미
 
 [GitHub에 기록한 개인용 ZIP](artifacts/clipman-extension-0.2.0-personal.zip)과 [SHA256](artifacts/clipman-extension-0.2.0-personal.zip.sha256)을 내려받을 수 있음. 빌드 생성 경로는 아래 release/이며 저장소 보관본과 바이트를 대조함.
